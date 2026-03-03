@@ -10,6 +10,7 @@ import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
 import com.kartersanamo.bedwars.arena.OreGenerator;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -63,7 +64,7 @@ public final class ArenaManager {
 
             config.getArenaRegion().ifPresent(region -> internalAdapter.snapshotArena(arena, region));
 
-            // Create generators from configuration.
+            // Create generators and spawn shop NPCs from configuration.
             for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
                 for (Location loc : teamDef.getIronGenerators()) {
                     arena.addGenerator(new OreGenerator(
@@ -82,6 +83,18 @@ public final class ArenaManager {
                             generatorsConfig.getGoldIntervalTicks(),
                             generatorsConfig.getGoldMaxItems()
                     ));
+                }
+
+                final Location shopNpcLocation = teamDef.getShopNpc();
+                if (shopNpcLocation != null && shopNpcLocation.getWorld() != null) {
+                    shopNpcLocation.getWorld().spawn(shopNpcLocation, Villager.class, villager -> {
+                        villager.setAI(false);
+                        villager.setCollidable(false);
+                        villager.setInvulnerable(true);
+                        villager.setSilent(true);
+                        villager.setCustomNameVisible(true);
+                        villager.setCustomName(teamDef.getColor().getChatColor() + "Item Shop");
+                    });
                 }
             }
 

@@ -63,6 +63,26 @@ public final class InternalAdapter {
     }
 
     /**
+     * Returns {@code true} if the snapshot recorded this position as air (or an
+     * air-equivalent block). This allows us to distinguish between original map
+     * blocks and blocks placed by players during the game.
+     */
+    public boolean isOriginallyAir(final IArena arena, final Block block) {
+        final Map<BlockPosition, BlockData> snapshot = arenaSnapshots.get(arena.getId());
+        if (snapshot == null || snapshot.isEmpty()) {
+            return false;
+        }
+
+        final BlockPosition position = BlockPosition.fromBlock(block);
+        final BlockData data = snapshot.get(position);
+        if (data == null) {
+            return false;
+        }
+
+        return data.getMaterial().isAir();
+    }
+
+    /**
      * Restores all modified blocks in the arena region back to their snapshot state.
      */
     public void restoreArena(final IArena arena) {

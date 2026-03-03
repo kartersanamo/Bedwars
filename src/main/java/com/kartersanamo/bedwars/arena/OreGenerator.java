@@ -74,7 +74,8 @@ public final class OreGenerator implements IGenerator {
             return;
         }
 
-        world.dropItemNaturally(location, new ItemStack(type.getDropMaterial(), 1));
+        final Item item = world.dropItem(location, new ItemStack(type.getDropMaterial(), 1));
+        item.setVelocity(new org.bukkit.util.Vector(0.0, 0.0, 0.0));
         lastDropTick = currentTick;
     }
 }

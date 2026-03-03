@@ -53,6 +53,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DamageListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopOpenListener(shopManager), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener(shopManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.sidebar.SidebarListener(sidebarService), this);
 
         final com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand bedwarsCommand =

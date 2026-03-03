@@ -1,6 +1,5 @@
 package com.kartersanamo.bedwars.shop;
 
-import com.kartersanamo.bedwars.shop.main.BuyItem;
 import com.kartersanamo.bedwars.shop.main.CategoryContent;
 import com.kartersanamo.bedwars.shop.main.ShopCategory;
 import org.bukkit.Bukkit;
@@ -10,10 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Minimal shop manager providing a single in-game shop GUI.
@@ -45,6 +41,24 @@ public final class ShopManager {
         int slot = 0;
         for (ShopCategory category : categories.values()) {
             inventory.setItem(slot++, category.getIcon());
+        }
+
+        player.openInventory(inventory);
+    }
+
+    public Collection<ShopCategory> getCategories() {
+        return Collections.unmodifiableCollection(categories.values());
+    }
+
+    public void openCategory(final Player player, final ShopCategory category) {
+        final String title = "Item Shop - " + category.getId();
+        final Inventory inventory = Bukkit.createInventory(player, 27, title);
+
+        int slot = 0;
+        for (CategoryContent content : category.getContents()) {
+            for (com.kartersanamo.bedwars.api.arena.shop.IContentTier tier : content.getTiers()) {
+                inventory.setItem(slot++, tier.getItem());
+            }
         }
 
         player.openInventory(inventory);

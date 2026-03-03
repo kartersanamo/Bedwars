@@ -102,6 +102,10 @@ public final class ConfigPath {
         public static final String ARENA_REGION_POS1 = "arena-region.pos1";
         public static final String ARENA_REGION_POS2 = "arena-region.pos2";
 
+        public static final String LOBBY_REGION = "lobby-region";
+        public static final String LOBBY_REGION_POS1 = "lobby-region.pos1";
+        public static final String LOBBY_REGION_POS2 = "lobby-region.pos2";
+
         private Arena() {
         }
     }

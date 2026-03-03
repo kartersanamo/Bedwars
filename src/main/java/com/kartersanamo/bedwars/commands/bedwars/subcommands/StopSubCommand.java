@@ -4,29 +4,30 @@ import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
+import com.kartersanamo.bedwars.arena.tasks.GameRestartingTask;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-public final class StartSubCommand extends ASubCommand {
+public final class StopSubCommand extends ASubCommand {
 
     @Override
     public String getName() {
-        return "start";
+        return "stop";
     }
 
     @Override
     public String getDescription() {
-        return "Force start the current Bedwars arena.";
+        return "Force stop the current Bedwars game and reset the arena.";
     }
 
     @Override
     public String getUsage() {
-        return "/bedwars start";
+        return "/bedwars stop";
     }
 
     @Override
     public String getPermission() {
-        return "bedwars.admin.start";
+        return "bedwars.admin.stop";
     }
 
     @Override
@@ -43,18 +44,15 @@ public final class StartSubCommand extends ASubCommand {
             return true;
         }
 
-        if (arena.getGameState() == EGameState.IN_GAME) {
-            sender.sendMessage("The game is already running.");
+        if (arena.getGameState() == EGameState.LOBBY_WAITING) {
+            sender.sendMessage("There is no running game to stop.");
             return true;
         }
 
-         if (arena.getPlayers().size() < arena.getMinPlayers()) {
-             sender.sendMessage("You cannot start this game yet. Minimum players required: " + arena.getMinPlayers());
-             return true;
-         }
-
-        arena.forceStart();
-        sender.sendMessage("Forced game start.");
+        arena.setGameState(EGameState.ENDING);
+        new GameRestartingTask(plugin, arena, 0).runTask(plugin);
+        sender.sendMessage("Stopped the current Bedwars game and started cleanup.");
         return true;
     }
 }
+

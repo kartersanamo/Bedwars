@@ -39,6 +39,12 @@ public final class JoinSubCommand extends ASubCommand {
         }
 
         final Bedwars plugin = Bedwars.getInstance();
+        final IArena currentArena = plugin.getArenaManager().getArena(player);
+        if (currentArena != null) {
+            sender.sendMessage("You are already in a Bedwars arena. Use /bedwars leave before joining another one.");
+            return true;
+        }
+
         final IArena targetArena;
 
         if (args.length >= 1) {
@@ -67,7 +73,11 @@ public final class JoinSubCommand extends ASubCommand {
         new TeamAssigner().assignPlayerToTeam(targetArena, player);
 
         player.teleport(targetArena.getLobbySpawn());
-        sender.sendMessage("Joined arena " + targetArena.getDisplayName());
+        final int current = targetArena.getPlayers().size();
+        final int max = targetArena.getMaxPlayers();
+        for (Player other : targetArena.getPlayers()) {
+            other.sendMessage(player.getName() + " joined the game (" + current + "/" + max + ").");
+        }
 
         targetArena.tryStartCountdown();
         return true;

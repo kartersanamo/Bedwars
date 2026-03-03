@@ -5,6 +5,8 @@ import com.kartersanamo.bedwars.api.command.IParentCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.JoinSubCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.LeaveSubCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.StartSubCommand;
+import com.kartersanamo.bedwars.commands.bedwars.subcommands.StopSubCommand;
+import com.kartersanamo.bedwars.commands.bedwars.subcommands.ListSubCommand;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 
@@ -18,6 +20,8 @@ public final class BedwarsCommand implements IParentCommand {
         registerSubCommand(new JoinSubCommand());
         registerSubCommand(new LeaveSubCommand());
         registerSubCommand(new StartSubCommand());
+        registerSubCommand(new StopSubCommand());
+        registerSubCommand(new ListSubCommand());
     }
 
     private void registerSubCommand(final ASubCommand subCommand) {
@@ -27,13 +31,13 @@ public final class BedwarsCommand implements IParentCommand {
     @Override
     public boolean onCommand(final CommandSender sender, final Command command, final String label, final String[] args) {
         if (args.length == 0) {
-            sender.sendMessage("Usage: /" + label + " <join|leave|start>");
+            sender.sendMessage("Usage: /" + label + " <join|leave|start|stop|list>");
             return true;
         }
 
         final ASubCommand sub = subCommands.get(args[0].toLowerCase(Locale.ROOT));
         if (sub == null) {
-            sender.sendMessage("Unknown subcommand. Use /" + label + " <join|leave|start>");
+            sender.sendMessage("Unknown subcommand. Use /" + label + " <join|leave|start|stop|list>");
             return true;
         }
 

@@ -123,6 +123,15 @@ public final class ArenaConfig {
         return readLocationList(ConfigPath.Arena.EMERALD_GENERATORS);
     }
 
+    public Optional<Region> getLobbyRegion() {
+        final Location pos1 = readLocation(ConfigPath.Arena.LOBBY_REGION_POS1);
+        final Location pos2 = readLocation(ConfigPath.Arena.LOBBY_REGION_POS2);
+        if (pos1 == null || pos2 == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new Region(pos1, pos2));
+    }
+
     public Optional<Region> getArenaRegion() {
         final Location pos1 = readLocation(ConfigPath.Arena.ARENA_REGION_POS1);
         final Location pos2 = readLocation(ConfigPath.Arena.ARENA_REGION_POS2);

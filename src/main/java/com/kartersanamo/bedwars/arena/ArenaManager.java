@@ -8,12 +8,19 @@ import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
 import com.kartersanamo.bedwars.arena.OreGenerator;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -55,14 +62,48 @@ public final class ArenaManager {
                 continue;
             }
 
-            final Arena arena = Arena.fromConfig(config, mainConfig, plugin);
+            final World world = createOrLoadWorldInstance(config);
+            if (world == null) {
+                logger.warning("Skipping arena '" + config.getId() + "' because its world could not be prepared.");
+                continue;
+            }
+
+            final Arena arena = Arena.fromConfig(config, mainConfig, plugin, world);
             if (!arena.validate()) {
                 logger.warning("Disabling arena '" + arena.getId() + "' due to validation errors.");
                 arena.setEnabled(false);
                 continue;
             }
 
-            config.getArenaRegion().ifPresent(region -> internalAdapter.snapshotArena(arena, region));
+            // Snapshot both arena-region and lobby-region (if present) so that
+            // both the playable map and the waiting lobby can be restored to
+            // their original state between games.
+            final Optional<ArenaConfig.Region> arenaRegionOpt = config.getArenaRegion();
+            final Optional<ArenaConfig.Region> lobbyRegionOpt = config.getLobbyRegion();
+            if (arenaRegionOpt.isPresent()) {
+                final ArenaConfig.Region base = arenaRegionOpt.get();
+                final ArenaConfig.Region snapshotRegion;
+                if (lobbyRegionOpt.isPresent()) {
+                    final Location a1 = base.getPos1();
+                    final Location a2 = base.getPos2();
+                    final Location b1 = lobbyRegionOpt.get().getPos1();
+                    final Location b2 = lobbyRegionOpt.get().getPos2();
+
+                    final int minX = Math.min(Math.min(a1.getBlockX(), a2.getBlockX()), Math.min(b1.getBlockX(), b2.getBlockX()));
+                    final int maxX = Math.max(Math.max(a1.getBlockX(), a2.getBlockX()), Math.max(b1.getBlockX(), b2.getBlockX()));
+                    final int minY = Math.min(Math.min(a1.getBlockY(), a2.getBlockY()), Math.min(b1.getBlockY(), b2.getBlockY()));
+                    final int maxY = Math.max(Math.max(a1.getBlockY(), a2.getBlockY()), Math.max(b1.getBlockY(), b2.getBlockY()));
+                    final int minZ = Math.min(Math.min(a1.getBlockZ(), a2.getBlockZ()), Math.min(b1.getBlockZ(), b2.getBlockZ()));
+                    final int maxZ = Math.max(Math.max(a1.getBlockZ(), a2.getBlockZ()), Math.max(b1.getBlockZ(), b2.getBlockZ()));
+
+                    final Location pos1 = new Location(world, minX, minY, minZ);
+                    final Location pos2 = new Location(world, maxX, maxY, maxZ);
+                    snapshotRegion = new ArenaConfig.Region(pos1, pos2);
+                } else {
+                    snapshotRegion = base;
+                }
+                internalAdapter.snapshotArena(arena, snapshotRegion);
+            }
 
             // Create generators and spawn shop NPCs from configuration.
             for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
@@ -70,7 +111,7 @@ public final class ArenaManager {
                     arena.addGenerator(new OreGenerator(
                             arena,
                             EGeneratorType.IRON,
-                            loc,
+                            new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getIronIntervalTicks(),
                             generatorsConfig.getIronMaxItems()
                     ));
@@ -79,7 +120,7 @@ public final class ArenaManager {
                     arena.addGenerator(new OreGenerator(
                             arena,
                             EGeneratorType.GOLD,
-                            loc,
+                            new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getGoldIntervalTicks(),
                             generatorsConfig.getGoldMaxItems()
                     ));
@@ -87,7 +128,9 @@ public final class ArenaManager {
 
                 final Location shopNpcLocation = teamDef.getShopNpc();
                 if (shopNpcLocation != null && shopNpcLocation.getWorld() != null) {
-                    shopNpcLocation.getWorld().spawn(shopNpcLocation, Villager.class, villager -> {
+                    final Location npcLoc = new Location(world, shopNpcLocation.getX(), shopNpcLocation.getY(),
+                            shopNpcLocation.getZ(), shopNpcLocation.getYaw(), shopNpcLocation.getPitch());
+                    world.spawn(npcLoc, Villager.class, villager -> {
                         villager.setAI(false);
                         villager.setCollidable(false);
                         villager.setInvulnerable(true);
@@ -102,7 +145,7 @@ public final class ArenaManager {
                 arena.addGenerator(new OreGenerator(
                         arena,
                         EGeneratorType.DIAMOND,
-                        loc,
+                        new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getDiamondIntervalTicks(),
                         generatorsConfig.getDiamondMaxItems()
                 ));
@@ -112,7 +155,7 @@ public final class ArenaManager {
                 arena.addGenerator(new OreGenerator(
                         arena,
                         EGeneratorType.EMERALD,
-                        loc,
+                        new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getEmeraldIntervalTicks(),
                         generatorsConfig.getEmeraldMaxItems()
                 ));
@@ -172,5 +215,75 @@ public final class ArenaManager {
         }
 
         return Optional.ofNullable(best);
+    }
+
+    /**
+     * Creates or loads an isolated world instance for the given arena config.
+     *
+     * The template world is NEVER modified; instead we copy its folder once to
+     * a new world folder and load that as the arena's active world. This allows
+     * multiple arenas to share the same template map without cross-contamination.
+     */
+    private World createOrLoadWorldInstance(final ArenaConfig config) {
+        final String templateName = config.getWorldName();
+        if (templateName == null || templateName.isEmpty()) {
+            logger.warning("Arena '" + config.getId() + "' has no world name configured.");
+            return null;
+        }
+
+        final String instanceName = templateName + "_bw_" + config.getId();
+
+        // If the instance world is already loaded, reuse it.
+        World existing = Bukkit.getWorld(instanceName);
+        if (existing != null) {
+            return existing;
+        }
+
+        final File worldContainer = Bukkit.getWorldContainer();
+        final Path templatePath = worldContainer.toPath().resolve(templateName);
+        final Path instancePath = worldContainer.toPath().resolve(instanceName);
+
+        if (!Files.isDirectory(templatePath)) {
+            logger.warning("Template world folder '" + templatePath + "' for arena '" + config.getId() + "' does not exist.");
+            return null;
+        }
+
+        // Only copy if the instance folder does not already exist (e.g. after server restart).
+        if (!Files.isDirectory(instancePath)) {
+            try {
+                copyWorldFolder(templatePath, instancePath);
+            } catch (IOException ex) {
+                logger.severe("Failed to copy world '" + templateName + "' for arena '" + config.getId() + "': " + ex.getMessage());
+                return null;
+            }
+        }
+
+        final WorldCreator creator = new WorldCreator(instanceName);
+        creator.environment(Objects.requireNonNullElse(Bukkit.getWorld(templateName), Bukkit.getWorlds().get(0)).getEnvironment());
+        return Bukkit.createWorld(creator);
+    }
+
+    private void copyWorldFolder(final Path source, final Path target) throws IOException {
+        Files.walk(source).forEach(path -> {
+            try {
+                final Path relative = source.relativize(path);
+                final Path dest = target.resolve(relative);
+
+                if (Files.isDirectory(path)) {
+                    if (!Files.isDirectory(dest)) {
+                        Files.createDirectories(dest);
+                    }
+                } else {
+                    final String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+                    // Skip files that should not be cloned verbatim.
+                    if ("session.lock".equals(name) || "uid.dat".equals(name)) {
+                        return;
+                    }
+                    Files.copy(path, dest, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
     }
 }

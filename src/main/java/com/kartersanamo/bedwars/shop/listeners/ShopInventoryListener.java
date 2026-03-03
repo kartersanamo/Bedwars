@@ -1,5 +1,8 @@
 package com.kartersanamo.bedwars.shop.listeners;
 
+import com.kartersanamo.bedwars.Bedwars;
+import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import com.kartersanamo.bedwars.shop.ShopManager;
 import com.kartersanamo.bedwars.shop.main.ShopCategory;
 import org.bukkit.ChatColor;
@@ -19,9 +22,11 @@ public final class ShopInventoryListener implements Listener {
     private static final String ROOT_TITLE = "Item Shop";
     private static final String CATEGORY_TITLE_PREFIX = ROOT_TITLE + " - ";
 
+    private final Bedwars plugin;
     private final ShopManager shopManager;
 
-    public ShopInventoryListener(final ShopManager shopManager) {
+    public ShopInventoryListener(final Bedwars plugin, final ShopManager shopManager) {
+        this.plugin = plugin;
         this.shopManager = shopManager;
     }
 
@@ -106,8 +111,18 @@ public final class ShopInventoryListener implements Listener {
             }
         }
 
-        // Give the player the purchased wool.
-        player.getInventory().addItem(new ItemStack(Material.WHITE_WOOL, 16));
+        // Determine the player's team wool color, falling back to white.
+        Material woolMaterial = Material.WHITE_WOOL;
+        final IArena arena = plugin.getArenaManager().getArena(player);
+        if (arena != null) {
+            final ITeam team = arena.getTeam(player).orElse(null);
+            if (team != null) {
+                woolMaterial = team.getColor().getWoolMaterial();
+            }
+        }
+
+        // Give the player the purchased wool in their team color.
+        player.getInventory().addItem(new ItemStack(woolMaterial, 16));
     }
 }
 

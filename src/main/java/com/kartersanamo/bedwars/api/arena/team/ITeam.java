@@ -34,4 +34,9 @@ public interface ITeam {
     void removePlayer(Player player);
 
     boolean contains(Player player);
+
+    /**
+     * Clears all members and resets transient team state between games.
+     */
+    void resetTeam();
 }

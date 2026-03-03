@@ -112,4 +112,10 @@ public final class BedwarsTeam implements ITeam {
     public boolean contains(final Player player) {
         return memberIds.contains(player.getUniqueId());
     }
+
+    @Override
+    public void resetTeam() {
+        memberIds.clear();
+        bedDestroyed = false;
+    }
 }

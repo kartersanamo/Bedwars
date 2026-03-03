@@ -38,6 +38,7 @@ public final class Arena implements IArena {
     private final int teamSize;
 
     private final ArenaConfig.Region region;
+    private final ArenaConfig.Region lobbyRegion;
 
     private final List<ITeam> teams;
     private final List<IGenerator> generators = new ArrayList<>();
@@ -62,6 +63,7 @@ public final class Arena implements IArena {
                   final int maxPlayers,
                   final int teamSize,
                   final ArenaConfig.Region region,
+                  final ArenaConfig.Region lobbyRegion,
                   final List<ITeam> teams,
                   final JavaPlugin plugin) {
         this.id = id;
@@ -73,27 +75,59 @@ public final class Arena implements IArena {
         this.maxPlayers = maxPlayers;
         this.teamSize = teamSize;
         this.region = region;
+        this.lobbyRegion = lobbyRegion;
         this.teams = Collections.unmodifiableList(new ArrayList<>(teams));
         this.plugin = plugin;
     }
 
-    public static Arena fromConfig(final ArenaConfig config, final MainConfig mainConfig, final JavaPlugin plugin) {
-        final World world = config.getWorld();
+    public static Arena fromConfig(final ArenaConfig config,
+                                   final MainConfig mainConfig,
+                                   final JavaPlugin plugin,
+                                   final World world) {
         final String id = config.getId();
 
-        final Location lobbySpawn = Optional.ofNullable(config.getLobbySpawn())
-                .orElseGet(() -> world != null ? world.getSpawnLocation() : null);
-        final Location spectatorSpawn = Optional.ofNullable(config.getSpectatorSpawn())
-                .orElse(lobbySpawn);
+        // Rebind all locations to the per-arena instance world.
+        final Location rawLobby = config.getLobbySpawn();
+        final Location lobbySpawn = rawLobby != null
+                ? new Location(world, rawLobby.getX(), rawLobby.getY(), rawLobby.getZ(),
+                rawLobby.getYaw(), rawLobby.getPitch())
+                : world.getSpawnLocation();
+
+        final Location rawSpectator = config.getSpectatorSpawn();
+        final Location spectatorSpawn = rawSpectator != null
+                ? new Location(world, rawSpectator.getX(), rawSpectator.getY(), rawSpectator.getZ(),
+                rawSpectator.getYaw(), rawSpectator.getPitch())
+                : lobbySpawn;
 
         final int minPlayers = config.getMinPlayers(mainConfig.getDefaultMinPlayers());
         final int maxPlayers = config.getMaxPlayers(mainConfig.getDefaultMaxPlayers());
         final int teamSize = config.getTeamSize(mainConfig.getDefaultTeamSize());
-        final ArenaConfig.Region region = config.getArenaRegion().orElse(null);
+
+        final ArenaConfig.Region region = config.getArenaRegion()
+                .map(r -> new ArenaConfig.Region(
+                        new Location(world, r.getPos1().getX(), r.getPos1().getY(), r.getPos1().getZ()),
+                        new Location(world, r.getPos2().getX(), r.getPos2().getY(), r.getPos2().getZ())
+                ))
+                .orElse(null);
+
+        final ArenaConfig.Region lobbyRegion = config.getLobbyRegion()
+                .map(r -> new ArenaConfig.Region(
+                        new Location(world, r.getPos1().getX(), r.getPos1().getY(), r.getPos1().getZ()),
+                        new Location(world, r.getPos2().getX(), r.getPos2().getY(), r.getPos2().getZ())
+                ))
+                .orElse(null);
 
         final List<ITeam> teams = new ArrayList<>();
         for (ArenaConfig.TeamDefinition def : config.getTeamDefinitions()) {
-            teams.add(new BedwarsTeam(def.getId(), def.getColor(), def.getSpawn(), def.getBed(), plugin));
+            final Location rawSpawn = def.getSpawn();
+            final Location spawn = new Location(world, rawSpawn.getX(), rawSpawn.getY(), rawSpawn.getZ(),
+                    rawSpawn.getYaw(), rawSpawn.getPitch());
+
+            final Location rawBed = def.getBed();
+            final Location bed = new Location(world, rawBed.getX(), rawBed.getY(), rawBed.getZ(),
+                    rawBed.getYaw(), rawBed.getPitch());
+
+            teams.add(new BedwarsTeam(def.getId(), def.getColor(), spawn, bed, plugin));
         }
 
         return new Arena(
@@ -106,6 +140,7 @@ public final class Arena implements IArena {
                 maxPlayers,
                 teamSize,
                 region,
+                lobbyRegion,
                 teams,
                 plugin
         );
@@ -191,6 +226,10 @@ public final class Arena implements IArena {
 
     public Optional<ArenaConfig.Region> getRegion() {
         return Optional.ofNullable(region);
+    }
+
+    public Optional<ArenaConfig.Region> getLobbyRegion() {
+        return Optional.ofNullable(lobbyRegion);
     }
 
     @Override
@@ -310,15 +349,23 @@ public final class Arena implements IArena {
         if (gameState != EGameState.LOBBY_WAITING) {
             return;
         }
-        if (players.size() < minPlayers) {
+        final int playerCount = players.size();
+        if (playerCount < minPlayers) {
             return;
         }
+
+        final int threshold = (int) Math.ceil(maxPlayers * 0.75D);
+        if (playerCount < threshold) {
+            return;
+        }
+
         gameState = EGameState.STARTING;
 
         if (startingTask != null) {
             startingTask.cancel();
         }
-        startingTask = new GameStartingTask(this, 20);
+        // Base countdown is 30 seconds once 75% of slots are filled.
+        startingTask = new GameStartingTask(this, 30);
         startingTask.runTaskTimer(plugin, 20L, 20L);
     }
 
@@ -333,6 +380,8 @@ public final class Arena implements IArena {
         for (Player player : getPlayers()) {
             getTeam(player).ifPresent(team -> player.teleport(team.getSpawnLocation()));
         }
+
+        clearLobbyRegion();
 
         if (playingTask != null) {
             playingTask.cancel();
@@ -360,6 +409,33 @@ public final class Arena implements IArena {
     public void resetAfterGame() {
         players.clear();
         spectators.clear();
+        for (ITeam team : teams) {
+            team.resetTeam();
+        }
         gameState = EGameState.LOBBY_WAITING;
+    }
+
+    private void clearLobbyRegion() {
+        if (lobbyRegion == null || world == null) {
+            return;
+        }
+
+        final Location pos1 = lobbyRegion.getPos1();
+        final Location pos2 = lobbyRegion.getPos2();
+
+        final int minX = Math.min(pos1.getBlockX(), pos2.getBlockX());
+        final int maxX = Math.max(pos1.getBlockX(), pos2.getBlockX());
+        final int minY = Math.min(pos1.getBlockY(), pos2.getBlockY());
+        final int maxY = Math.max(pos1.getBlockY(), pos2.getBlockY());
+        final int minZ = Math.min(pos1.getBlockZ(), pos2.getBlockZ());
+        final int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    world.getBlockAt(x, y, z).setType(org.bukkit.Material.AIR, false);
+                }
+            }
+        }
     }
 }

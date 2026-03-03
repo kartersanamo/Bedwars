@@ -1,0 +1,16 @@
+iron:
+  interval-ticks: 20
+  max-items: 48
+
+gold:
+  interval-ticks: 80
+  max-items: 32
+
+diamond:
+  interval-ticks: 600
+  max-items: 16
+
+emerald:
+  interval-ticks: 1200
+  max-items: 16
+

@@ -1,0 +1,161 @@
+# Basic arena metadata
+world: bedwars_world          # Name of the void world containing this map
+display-name: "Example Arena"
+enabled: true
+
+# Player counts and team size
+min-players: 2
+max-players: 16
+team-size: 4
+
+# Lobby and spectator spawns (inside the arena world)
+lobby-spawn:
+  world: bedwars_world
+  x: 0.5
+  y: 65.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+spectator-spawn:
+  world: bedwars_world
+  x: 0.5
+  y: 90.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+# Team configuration
+teams:
+  RED:
+    color: RED                # Must match ETeamColor (RED, BLUE, GREEN, etc.)
+    spawn:
+      world: bedwars_world
+      x: 32.5
+      y: 65.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    bed:
+      world: bedwars_world
+      x: 32.0
+      y: 65.0
+      z: 0.0
+      yaw: 0.0
+      pitch: 0.0
+    generator-iron:
+      iron1:
+        world: bedwars_world
+        x: 32.5
+        y: 64.0
+        z: 4.5
+        yaw: 0.0
+        pitch: 0.0
+    generator-gold:
+      gold1:
+        world: bedwars_world
+        x: 32.5
+        y: 64.0
+        z: 3.5
+        yaw: 0.0
+        pitch: 0.0
+    shop-npc:
+      world: bedwars_world
+      x: 28.5
+      y: 65.0
+      z: 0.5
+      yaw: 90.0
+      pitch: 0.0
+
+  BLUE:
+    color: BLUE
+    spawn:
+      world: bedwars_world
+      x: -32.5
+      y: 65.0
+      z: 0.5
+      yaw: 0.0
+      pitch: 0.0
+    bed:
+      world: bedwars_world
+      x: -32.0
+      y: 65.0
+      z: 0.0
+      yaw: 0.0
+      pitch: 0.0
+    generator-iron:
+      iron1:
+        world: bedwars_world
+        x: -32.5
+        y: 64.0
+        z: 4.5
+        yaw: 0.0
+        pitch: 0.0
+    generator-gold:
+      gold1:
+        world: bedwars_world
+        x: -32.5
+        y: 64.0
+        z: 3.5
+        yaw: 0.0
+        pitch: 0.0
+    shop-npc:
+      world: bedwars_world
+      x: -28.5
+      y: 65.0
+      z: 0.5
+      yaw: -90.0
+      pitch: 0.0
+
+  # Add more teams here (GREEN, YELLOW, etc.) following the same structure.
+
+# Shared diamond generators (side islands)
+diamond-generators:
+  d1:
+    world: bedwars_world
+    x: 0.5
+    y: 65.0
+    z: 32.5
+    yaw: 0.0
+    pitch: 0.0
+  d2:
+    world: bedwars_world
+    x: 0.5
+    y: 65.0
+    z: -32.5
+    yaw: 0.0
+    pitch: 0.0
+
+# Shared emerald generators (center islands)
+emerald-generators:
+  e1:
+    world: bedwars_world
+    x: 0.5
+    y: 65.0
+    z: 8.5
+    yaw: 0.0
+    pitch: 0.0
+  e2:
+    world: bedwars_world
+    x: 0.5
+    y: 65.0
+    z: -8.5
+    yaw: 0.0
+    pitch: 0.0
+
+# Region used for snapshot/restore (must fully cover the playable map)
+arena-region:
+  pos1:
+    world: bedwars_world
+    x: -64
+    y: 0
+    z: -64
+    yaw: 0.0
+    pitch: 0.0
+  pos2:
+    world: bedwars_world
+    x: 64
+    y: 128
+    z: 64
+    yaw: 0.0
+    pitch: 0.0

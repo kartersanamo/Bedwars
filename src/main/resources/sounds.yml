@@ -1,0 +1,40 @@
+bed-destroyed:
+  sound: ENTITY_WITHER_DEATH
+  volume: 1.0
+  pitch: 1.0
+
+kill:
+  sound: ENTITY_PLAYER_LEVELUP
+  volume: 1.0
+  pitch: 1.5
+
+final-kill:
+  sound: ENTITY_ENDER_DRAGON_DEATH
+  volume: 1.0
+  pitch: 1.0
+
+countdown-tick:
+  sound: BLOCK_NOTE_BLOCK_PLING
+  volume: 1.0
+  pitch: 1.0
+
+game-start:
+  sound: ENTITY_ENDER_DRAGON_GROWL
+  volume: 1.0
+  pitch: 1.0
+
+victory:
+  sound: UI_TOAST_CHALLENGE_COMPLETE
+  volume: 1.0
+  pitch: 1.0
+
+defeat:
+  sound: BLOCK_ANVIL_LAND
+  volume: 0.8
+  pitch: 0.8
+
+generator-pickup:
+  sound: ENTITY_ITEM_PICKUP
+  volume: 0.6
+  pitch: 1.3
+

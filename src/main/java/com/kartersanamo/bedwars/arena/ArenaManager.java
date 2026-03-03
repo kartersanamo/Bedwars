@@ -1,0 +1,163 @@
+package com.kartersanamo.bedwars.arena;
+
+import com.kartersanamo.bedwars.api.arena.EGameState;
+import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.configuration.ArenaConfig;
+import com.kartersanamo.bedwars.configuration.MainConfig;
+import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
+import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
+import com.kartersanamo.bedwars.arena.OreGenerator;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.util.*;
+import java.util.logging.Logger;
+
+/**
+ * Central registry for all arenas on this server instance.
+ */
+public final class ArenaManager {
+
+    private final JavaPlugin plugin;
+    private final MainConfig mainConfig;
+    private final GeneratorsConfig generatorsConfig;
+    private final InternalAdapter internalAdapter;
+    private final Logger logger;
+
+    private final Map<String, IArena> arenasById = new HashMap<>();
+    private final Map<UUID, IArena> arenaByPlayer = new HashMap<>();
+
+    public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter) {
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.mainConfig = Objects.requireNonNull(mainConfig, "mainConfig");
+        this.generatorsConfig = Objects.requireNonNull(generatorsConfig, "generatorsConfig");
+        this.internalAdapter = Objects.requireNonNull(internalAdapter, "internalAdapter");
+        this.logger = plugin.getLogger();
+    }
+
+    public void loadArenas() {
+        arenasById.clear();
+        arenaByPlayer.clear();
+
+        final File arenasDirectory = new File(plugin.getDataFolder(), "arenas");
+        final List<ArenaConfig> configs = ArenaConfig.loadAll(arenasDirectory, logger);
+        if (configs.isEmpty()) {
+            logger.warning("No arena configuration files found in " + arenasDirectory.getAbsolutePath());
+            return;
+        }
+
+        for (ArenaConfig config : configs) {
+            if (!config.isEnabled()) {
+                continue;
+            }
+
+            final Arena arena = Arena.fromConfig(config, mainConfig, plugin);
+            if (!arena.validate()) {
+                logger.warning("Disabling arena '" + arena.getId() + "' due to validation errors.");
+                arena.setEnabled(false);
+                continue;
+            }
+
+            config.getArenaRegion().ifPresent(region -> internalAdapter.snapshotArena(arena, region));
+
+            // Create generators from configuration.
+            for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
+                for (Location loc : teamDef.getIronGenerators()) {
+                    arena.addGenerator(new OreGenerator(
+                            arena,
+                            EGeneratorType.IRON,
+                            loc,
+                            generatorsConfig.getIronIntervalTicks(),
+                            generatorsConfig.getIronMaxItems()
+                    ));
+                }
+                for (Location loc : teamDef.getGoldGenerators()) {
+                    arena.addGenerator(new OreGenerator(
+                            arena,
+                            EGeneratorType.GOLD,
+                            loc,
+                            generatorsConfig.getGoldIntervalTicks(),
+                            generatorsConfig.getGoldMaxItems()
+                    ));
+                }
+            }
+
+            for (Location loc : config.getDiamondGenerators()) {
+                arena.addGenerator(new OreGenerator(
+                        arena,
+                        EGeneratorType.DIAMOND,
+                        loc,
+                        generatorsConfig.getDiamondIntervalTicks(),
+                        generatorsConfig.getDiamondMaxItems()
+                ));
+            }
+
+            for (Location loc : config.getEmeraldGenerators()) {
+                arena.addGenerator(new OreGenerator(
+                        arena,
+                        EGeneratorType.EMERALD,
+                        loc,
+                        generatorsConfig.getEmeraldIntervalTicks(),
+                        generatorsConfig.getEmeraldMaxItems()
+                ));
+            }
+
+            arenasById.put(arena.getId().toLowerCase(Locale.ROOT), arena);
+            logger.info("Loaded arena '" + arena.getId() + "' (" + arena.getDisplayName() + ")");
+        }
+    }
+
+    public Collection<IArena> getArenas() {
+        return Collections.unmodifiableCollection(arenasById.values());
+    }
+
+    public IArena getArena(final String id) {
+        return id == null ? null : arenasById.get(id.toLowerCase(Locale.ROOT));
+    }
+
+    public IArena getArena(final Player player) {
+        return arenaByPlayer.get(player.getUniqueId());
+    }
+
+    public void playerJoinedArena(final Player player, final IArena arena) {
+        arenaByPlayer.put(player.getUniqueId(), arena);
+    }
+
+    public void playerLeftArena(final Player player) {
+        arenaByPlayer.remove(player.getUniqueId());
+    }
+
+    /**
+     * Finds the best joinable arena for the given player.
+     *
+     * Preference is given to arenas that are already filling up but not yet full.
+     */
+    public Optional<IArena> findBestJoinableArena() {
+        IArena best = null;
+        int bestPlayerCount = -1;
+
+        for (IArena arena : arenasById.values()) {
+            if (!arena.isEnabled()) {
+                continue;
+            }
+            final EGameState state = arena.getGameState();
+            if (state != EGameState.LOBBY_WAITING && state != EGameState.STARTING) {
+                continue;
+            }
+            final int size = arena.getPlayers().size();
+            if (size >= arena.getMaxPlayers()) {
+                continue;
+            }
+
+            if (size > bestPlayerCount) {
+                bestPlayerCount = size;
+                best = arena;
+            }
+        }
+
+        return Optional.ofNullable(best);
+    }
+}

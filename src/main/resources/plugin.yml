@@ -1,0 +1,13 @@
+name: Bedwars
+description: Bedwars minigame by Karter Sanamo
+version: '1.0.0'
+main: com.kartersanamo.bedwars.Bedwars
+api-version: '1.21'
+author: Karter Sanamo
+softdepend: [PlaceholderAPI, Multiverse-Core]
+
+commands:
+  bedwars:
+    description: Main Bedwars command.
+    aliases: [bw]
+    usage: /bedwars <join|leave|start>

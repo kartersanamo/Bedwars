@@ -1,0 +1,30 @@
+debug:
+  enabled: false
+
+lobby:
+  world: world
+  # Optional explicit spawn location inside the lobby world.
+  # If omitted, the world's default spawn location is used.
+  # spawn:
+  #   world: world
+  #   x: 0.5
+  #   y: 65.0
+  #   z: 0.5
+  #   yaw: 0.0
+  #   pitch: 0.0
+
+arena:
+  defaults:
+    min-players: 2
+    max-players: 16
+    team-size: 4
+
+gameplay:
+  respawn-delay-seconds: 5
+  void-y: 0
+
+database:
+  type: sqlite
+  sqlite:
+    file: bedwars.db
+

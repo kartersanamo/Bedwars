@@ -2,7 +2,7 @@ package com.kartersanamo.bedwars.shop.listeners;
 
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import com.kartersanamo.bedwars.api.arena.team.ITeam;
+import com.kartersanamo.bedwars.api.arena.shop.IContentTier;
 import com.kartersanamo.bedwars.shop.ShopManager;
 import com.kartersanamo.bedwars.shop.main.ShopCategory;
 import org.bukkit.ChatColor;
@@ -36,9 +36,7 @@ public final class ShopInventoryListener implements Listener {
             return;
         }
 
-        final Inventory inventory = event.getView().getTopInventory();
         final String title = event.getView().getTitle();
-
         if (!title.startsWith(ROOT_TITLE)) {
             return;
         }
@@ -48,14 +46,18 @@ public final class ShopInventoryListener implements Listener {
             return;
         }
 
-        // Never allow taking items from the shop inventories.
         event.setCancelled(true);
 
         if (ROOT_TITLE.equals(title)) {
             handleRootClick(player, clicked);
         } else if (title.startsWith(CATEGORY_TITLE_PREFIX)) {
-            final String categoryId = ChatColor.stripColor(title.substring(CATEGORY_TITLE_PREFIX.length())).toLowerCase();
-            handleCategoryClick(player, categoryId, clicked);
+            final String categoryId = ChatColor.stripColor(title.substring(CATEGORY_TITLE_PREFIX.length())).trim().toLowerCase();
+            final int slot = event.getRawSlot();
+            final Inventory top = event.getView().getTopInventory();
+            if (slot >= 0 && slot < top.getSize()) {
+                final ShopCategory category = shopManager.getCategory(categoryId);
+                handleCategoryClick(player, category, slot);
+            }
         }
     }
 
@@ -68,39 +70,36 @@ public final class ShopInventoryListener implements Listener {
         }
     }
 
-    private void handleCategoryClick(final Player player, final String categoryId, final ItemStack clicked) {
-        // MVP: single category "blocks" with a single wool tier purchasable using iron ingots.
-        if (!"blocks".equalsIgnoreCase(categoryId)) {
-            return;
-        }
+    private void handleCategoryClick(final Player player, final ShopCategory category, final int slot) {
+        if (category == null) return;
 
-        if (clicked.getType() != Material.WHITE_WOOL) {
-            return;
-        }
+        final IContentTier tier = shopManager.getTierAtSlot(category, slot);
+        if (tier == null) return;
 
-        // Cost is 4 iron ingots for 16 wool (matches ShopManager default).
-        final int cost = 4;
-        final Material currency = Material.IRON_INGOT;
+        final IArena arena = plugin.getArenaManager().getArena(player);
+        final int cost = tier.getCostFor(arena);
+        final Material currency = tier.getCurrency();
 
-        int totalCurrency = 0;
+        int total = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
             if (stack != null && stack.getType() == currency) {
-                totalCurrency += stack.getAmount();
+                total += stack.getAmount();
             }
         }
 
-        if (totalCurrency < cost) {
-            player.sendMessage(ChatColor.RED + "You do not have enough iron to purchase this.");
+        if (total < cost) {
+            player.sendMessage(ChatColor.RED + "You don't have enough " + formatCurrency(currency) + " (need " + cost + ").");
+            return;
+        }
+        if (!tier.canPurchase(player, arena)) {
+            player.sendMessage(ChatColor.RED + "You already have this upgrade or better.");
             return;
         }
 
-        // Remove the cost.
         int remaining = cost;
         for (int i = 0; i < player.getInventory().getSize() && remaining > 0; i++) {
             final ItemStack stack = player.getInventory().getItem(i);
-            if (stack == null || stack.getType() != currency) {
-                continue;
-            }
+            if (stack == null || stack.getType() != currency) continue;
             if (stack.getAmount() > remaining) {
                 stack.setAmount(stack.getAmount() - remaining);
                 player.getInventory().setItem(i, stack);
@@ -111,18 +110,15 @@ public final class ShopInventoryListener implements Listener {
             }
         }
 
-        // Determine the player's team wool color, falling back to white.
-        Material woolMaterial = Material.WHITE_WOOL;
-        final IArena arena = plugin.getArenaManager().getArena(player);
-        if (arena != null) {
-            final ITeam team = arena.getTeam(player).orElse(null);
-            if (team != null) {
-                woolMaterial = team.getColor().getWoolMaterial();
-            }
-        }
+        tier.giveReward(player, arena);
+        player.sendMessage(ChatColor.GREEN + "Purchased!");
+    }
 
-        // Give the player the purchased wool in their team color.
-        player.getInventory().addItem(new ItemStack(woolMaterial, 16));
+    private static String formatCurrency(final Material m) {
+        if (m == Material.IRON_INGOT) return "iron";
+        if (m == Material.GOLD_INGOT) return "gold";
+        if (m == Material.DIAMOND) return "diamonds";
+        if (m == Material.EMERALD) return "emeralds";
+        return m.name().toLowerCase();
     }
 }
-

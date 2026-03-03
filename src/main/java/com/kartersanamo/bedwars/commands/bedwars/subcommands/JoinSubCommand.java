@@ -3,11 +3,8 @@ package com.kartersanamo.bedwars.commands.bedwars.subcommands;
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
-import com.kartersanamo.bedwars.arena.team.TeamAssigner;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-
-import java.util.Optional;
 
 public final class JoinSubCommand extends ASubCommand {
 
@@ -45,41 +42,8 @@ public final class JoinSubCommand extends ASubCommand {
             return true;
         }
 
-        final IArena targetArena;
-
-        if (args.length >= 1) {
-            targetArena = plugin.getArenaManager().getArena(args[0]);
-            if (targetArena == null) {
-                sender.sendMessage("Unknown arena: " + args[0]);
-                return true;
-            }
-        } else {
-            final Optional<IArena> best = plugin.getArenaManager().findBestJoinableArena();
-            if (best.isEmpty()) {
-                sender.sendMessage("No joinable arenas available.");
-                return true;
-            }
-            targetArena = best.get();
-        }
-
-        if (!targetArena.addPlayer(player)) {
-            sender.sendMessage("Could not join this arena (it may be full or not joinable).");
-            return true;
-        }
-
-        plugin.getArenaManager().playerJoinedArena(player, targetArena);
-
-        // Assign to a team.
-        new TeamAssigner().assignPlayerToTeam(targetArena, player);
-
-        player.teleport(targetArena.getLobbySpawn());
-        final int current = targetArena.getPlayers().size();
-        final int max = targetArena.getMaxPlayers();
-        for (Player other : targetArena.getPlayers()) {
-            other.sendMessage(player.getName() + " joined the game (" + current + "/" + max + ").");
-        }
-
-        targetArena.tryStartCountdown();
+        // Open the main GUI instead of direct join.
+        com.kartersanamo.bedwars.gui.GameModeGui.openFor(player);
         return true;
     }
 }

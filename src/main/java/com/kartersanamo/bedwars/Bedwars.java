@@ -28,6 +28,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private InternalAdapter internalAdapter;
     private com.kartersanamo.bedwars.shop.ShopManager shopManager;
     private com.kartersanamo.bedwars.sidebar.SidebarService sidebarService;
+    private com.kartersanamo.bedwars.hologram.HologramManager hologramManager;
 
     @Override
     public void onEnable() {
@@ -43,6 +44,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         this.internalAdapter = new InternalAdapter();
         this.shopManager = new com.kartersanamo.bedwars.shop.ShopManager();
         this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService();
+        this.hologramManager = new com.kartersanamo.bedwars.hologram.HologramManager(this);
 
         initialiseDatabase();
         initialiseArenas();
@@ -56,6 +58,8 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopOpenListener(shopManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener(this, shopManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.sidebar.SidebarListener(sidebarService), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.gui.GameModeGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.SwordAndArmorEnforcementListener(this), this);
 
         final com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand bedwarsCommand =
                 new com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand();
@@ -68,10 +72,17 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         new com.kartersanamo.bedwars.arena.tasks.OneTickGenerators(this)
                 .runTaskTimer(this, 1L, 1L);
 
+        // Start sidebar refresh task (once per second).
+        new com.kartersanamo.bedwars.sidebar.SidebarUpdateTask(this, sidebarService)
+                .runTaskTimer(this, 20L, 20L);
+
     }
 
     @Override
     public void onDisable() {
+        if (hologramManager != null) {
+            hologramManager.clearAll();
+        }
         if (database != null && database.isConnected()) {
             database.flushCache();
             database.disconnect();
@@ -143,5 +154,14 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     @Override
     public InternalAdapter getInternalAdapter() {
         return internalAdapter;
+    }
+
+    @Override
+    public com.kartersanamo.bedwars.sidebar.SidebarService getSidebarService() {
+        return sidebarService;
+    }
+
+    public com.kartersanamo.bedwars.hologram.HologramManager getHologramManager() {
+        return hologramManager;
     }
 }

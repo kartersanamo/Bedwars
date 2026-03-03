@@ -26,6 +26,27 @@ public final class ConfigPath {
         public static final String GAME_RESPAWN_DELAY_SECONDS = "gameplay.respawn-delay-seconds";
         public static final String GAME_VOID_Y = "gameplay.void-y";
 
+        public static final String GENERATOR_CAPS_ROOT = "gameplay.generator-caps";
+        public static final String GENERATOR_CAPS_SOLO_IRON = "gameplay.generator-caps.solo.iron";
+        public static final String GENERATOR_CAPS_SOLO_GOLD = "gameplay.generator-caps.solo.gold";
+        public static final String GENERATOR_CAPS_SOLO_DIAMOND = "gameplay.generator-caps.solo.diamond";
+        public static final String GENERATOR_CAPS_SOLO_EMERALD = "gameplay.generator-caps.solo.emerald";
+
+        public static final String GENERATOR_CAPS_DOUBLES_IRON = "gameplay.generator-caps.doubles.iron";
+        public static final String GENERATOR_CAPS_DOUBLES_GOLD = "gameplay.generator-caps.doubles.gold";
+        public static final String GENERATOR_CAPS_DOUBLES_DIAMOND = "gameplay.generator-caps.doubles.diamond";
+        public static final String GENERATOR_CAPS_DOUBLES_EMERALD = "gameplay.generator-caps.doubles.emerald";
+
+        public static final String GENERATOR_CAPS_THREES_IRON = "gameplay.generator-caps.threes.iron";
+        public static final String GENERATOR_CAPS_THREES_GOLD = "gameplay.generator-caps.threes.gold";
+        public static final String GENERATOR_CAPS_THREES_DIAMOND = "gameplay.generator-caps.threes.diamond";
+        public static final String GENERATOR_CAPS_THREES_EMERALD = "gameplay.generator-caps.threes.emerald";
+
+        public static final String GENERATOR_CAPS_FOURS_IRON = "gameplay.generator-caps.fours.iron";
+        public static final String GENERATOR_CAPS_FOURS_GOLD = "gameplay.generator-caps.fours.gold";
+        public static final String GENERATOR_CAPS_FOURS_DIAMOND = "gameplay.generator-caps.fours.diamond";
+        public static final String GENERATOR_CAPS_FOURS_EMERALD = "gameplay.generator-caps.fours.emerald";
+
         public static final String DATABASE_TYPE = "database.type";
         public static final String DATABASE_SQLITE_FILE = "database.sqlite.file";
 

@@ -21,8 +21,8 @@ public final class SidebarListener implements Listener {
 
     @EventHandler
     public void onJoin(final PlayerJoinEvent event) {
-        // Sidebar will be populated once the player joins an arena.
-        sidebarService.createSidebar(event.getPlayer());
+        // Do not create a sidebar on join. Sidebar is only created when the player is in an arena
+        // (see SidebarUpdateTask -> updateForArena), so players outside Bedwars never see "Bedwars" in the sidebar.
     }
 
     @EventHandler

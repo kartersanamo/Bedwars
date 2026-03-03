@@ -51,9 +51,19 @@ public final class GameRestartingTask extends BukkitRunnable {
             player.getInventory().clear();
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
+            plugin.getSidebarService().removeSidebar(player);
             if (plugin.getMainConfig().getLobbySpawn() != null) {
                 player.teleport(plugin.getMainConfig().getLobbySpawn());
             }
+            // So the player can join another game without /bw leave.
+            plugin.getArenaManager().playerLeftArena(player);
+        }
+        for (Player spectator : arena.getSpectators()) {
+            plugin.getSidebarService().removeSidebar(spectator);
+            if (plugin.getMainConfig().getLobbySpawn() != null) {
+                spectator.teleport(plugin.getMainConfig().getLobbySpawn());
+            }
+            plugin.getArenaManager().playerLeftArena(spectator);
         }
 
         // Persist stats after each game.

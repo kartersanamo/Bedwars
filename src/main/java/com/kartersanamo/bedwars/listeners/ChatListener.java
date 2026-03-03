@@ -38,12 +38,14 @@ public final class ChatListener implements Listener {
         }
 
         final ITeam team = arena.getTeam(player).orElse(null);
-        final ChatColor teamColor = team != null ? team.getColor().getChatColor() : ChatColor.GRAY;
-        final String colorName = team != null ? team.getColor().name() : "NONE";
-
-        final String prefix = teamColor + "[" + colorName + "] ";
-        final String format = prefix + ChatColor.GRAY + "%1$s: %2$s";
-
+        final String format;
+        if (team != null) {
+            final String prefix = team.getColor().getChatColor() + "[" + team.getColor().name() + "] ";
+            format = prefix + ChatColor.GRAY + "%1$s: %2$s";
+        } else {
+            // Waiting lobby: no team yet, just light gray "name: message"
+            format = ChatColor.GRAY + "%1$s: %2$s";
+        }
         event.setFormat(format);
     }
 }

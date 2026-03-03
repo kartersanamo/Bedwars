@@ -10,4 +10,4 @@ commands:
   bedwars:
     description: Main Bedwars command.
     aliases: [bw]
-    usage: /bedwars <join|leave|start|stop|list>
+    usage: /bedwars <join|leave|start|forcestart|stop|cancel|list|gui>

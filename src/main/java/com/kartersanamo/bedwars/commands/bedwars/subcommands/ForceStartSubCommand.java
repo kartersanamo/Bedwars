@@ -1,31 +1,32 @@
 package com.kartersanamo.bedwars.commands.bedwars.subcommands;
 
 import com.kartersanamo.bedwars.Bedwars;
+import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-public final class LeaveSubCommand extends ASubCommand {
+public final class ForceStartSubCommand extends ASubCommand {
 
     @Override
     public String getName() {
-        return "leave";
+        return "forcestart";
     }
 
     @Override
     public String getDescription() {
-        return "Leave your current Bedwars arena.";
+        return "Force start the current Bedwars arena regardless of conditions.";
     }
 
     @Override
     public String getUsage() {
-        return "/bedwars leave";
+        return "/bedwars forcestart";
     }
 
     @Override
     public String getPermission() {
-        return "bedwars.leave";
+        return "bedwars.admin.forcestart";
     }
 
     @Override
@@ -42,15 +43,14 @@ public final class LeaveSubCommand extends ASubCommand {
             return true;
         }
 
-        arena.removePlayer(player, true);
-        plugin.getArenaManager().playerLeftArena(player);
-        plugin.getSidebarService().removeSidebar(player);
-
-        if (plugin.getMainConfig().getLobbySpawn() != null) {
-            player.teleport(plugin.getMainConfig().getLobbySpawn());
+        if (arena.getGameState() == EGameState.IN_GAME) {
+            sender.sendMessage("The game is already running.");
+            return true;
         }
 
-        sender.sendMessage("You left the arena.");
+        arena.forceStart();
+        sender.sendMessage("Force-started the game, ignoring normal conditions.");
         return true;
     }
 }
+

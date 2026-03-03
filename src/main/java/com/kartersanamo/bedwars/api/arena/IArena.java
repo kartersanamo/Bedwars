@@ -76,6 +76,11 @@ public interface IArena {
     void handlePlayerDeath(Player player, Player killer);
 
     /**
+     * Returns whether the player currently has spawn protection (invulnerability after respawn).
+     */
+    boolean hasSpawnProtection(Player player);
+
+    /**
      * Called when a team's bed has been destroyed.
      */
     void handleBedDestroyed(ITeam victimTeam, Player breaker);

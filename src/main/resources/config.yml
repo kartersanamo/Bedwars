@@ -22,6 +22,27 @@ arena:
 gameplay:
   respawn-delay-seconds: 5
   void-y: 0
+  generator-caps:
+    solo:
+      iron: 48
+      gold: 8
+      diamond: 4
+      emerald: 2
+    doubles:
+      iron: 48
+      gold: 8
+      diamond: 4
+      emerald: 2
+    threes:
+      iron: 48
+      gold: 8
+      diamond: 4
+      emerald: 2
+    fours:
+      iron: 48
+      gold: 8
+      diamond: 4
+      emerald: 2
 
 database:
   type: sqlite

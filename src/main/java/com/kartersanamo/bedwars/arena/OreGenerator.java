@@ -51,6 +51,14 @@ public final class OreGenerator implements IGenerator {
         return location.clone();
     }
 
+    public int getIntervalTicks() {
+        return intervalTicks;
+    }
+
+    public long getLastDropTick() {
+        return lastDropTick;
+    }
+
     @Override
     public void tick(final long currentTick) {
         if (intervalTicks <= 0) {

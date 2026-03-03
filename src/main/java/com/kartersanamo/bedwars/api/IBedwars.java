@@ -6,6 +6,7 @@ import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.SoundsConfig;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import com.kartersanamo.bedwars.sidebar.SidebarService;
 import org.bukkit.plugin.Plugin;
 
 /**
@@ -50,4 +51,9 @@ public interface IBedwars {
      * Internal map restore adapter used by arenas and listeners.
      */
     InternalAdapter getInternalAdapter();
+
+    /**
+     * Sidebar manager for in-game scoreboards. Remove a player's sidebar when they leave an arena.
+     */
+    SidebarService getSidebarService();
 }

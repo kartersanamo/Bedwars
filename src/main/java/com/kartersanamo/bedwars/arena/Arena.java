@@ -3,7 +3,10 @@ package com.kartersanamo.bedwars.arena;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.arena.generator.IGenerator;
+import com.kartersanamo.bedwars.api.arena.team.ETeamColor;
 import com.kartersanamo.bedwars.api.arena.team.ITeam;
+import com.kartersanamo.bedwars.arena.kit.ArmorTier;
+import com.kartersanamo.bedwars.arena.kit.ToolTier;
 import com.kartersanamo.bedwars.arena.team.BedwarsTeam;
 import com.kartersanamo.bedwars.arena.tasks.GamePlayingTask;
 import com.kartersanamo.bedwars.arena.tasks.GameRestartingTask;
@@ -12,9 +15,14 @@ import com.kartersanamo.bedwars.sidebar.SidebarService;
 import com.kartersanamo.bedwars.configuration.ArenaConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
@@ -45,6 +53,14 @@ public final class Arena implements IArena {
 
     private final Set<UUID> players = new HashSet<>();
     private final Set<UUID> spectators = new HashSet<>();
+
+    /** Expiry timestamp (system millis) for spawn protection per player. */
+    private final Map<UUID, Long> spawnProtectionUntil = new HashMap<>();
+
+    private final Map<UUID, ArmorTier> playerArmorTier = new HashMap<>();
+    private final Map<UUID, ToolTier> playerAxeTier = new HashMap<>();
+    private final Map<UUID, ToolTier> playerPickaxeTier = new HashMap<>();
+    private final Set<UUID> playerHasShears = new HashSet<>();
 
     private final JavaPlugin plugin;
 
@@ -328,8 +344,14 @@ public final class Arena implements IArena {
 
     @Override
     public void removePlayer(final Player player, final boolean toLobby) {
-        players.remove(player.getUniqueId());
-        spectators.remove(player.getUniqueId());
+        final UUID uuid = player.getUniqueId();
+        players.remove(uuid);
+        spectators.remove(uuid);
+        spawnProtectionUntil.remove(uuid);
+        playerArmorTier.remove(uuid);
+        playerAxeTier.remove(uuid);
+        playerPickaxeTier.remove(uuid);
+        playerHasShears.remove(uuid);
 
         getTeam(player).ifPresent(team -> team.removePlayer(player));
 
@@ -376,9 +398,18 @@ public final class Arena implements IArena {
         }
         gameState = EGameState.IN_GAME;
 
-        // Teleport all players to their team spawn.
-        for (Player player : getPlayers()) {
-            getTeam(player).ifPresent(team -> player.teleport(team.getSpawnLocation()));
+        // Assign all players to teams randomly, then teleport (addPlayer teleports to team spawn).
+        assignAllPlayersToTeamsRandomly();
+
+        // Empty teams have no bed from the start: red X on scoreboard/list; their generators still run.
+        for (ITeam team : teams) {
+            if (team.getMemberIds().isEmpty()) {
+                team.setBedDestroyed(true);
+            }
+        }
+
+        for (Player p : getPlayers()) {
+            giveStarterKit(p);
         }
 
         clearLobbyRegion();
@@ -390,14 +421,57 @@ public final class Arena implements IArena {
         playingTask.runTaskTimer(plugin, 20L, 20L);
     }
 
+    private static final int RESPAWN_SPECTATOR_SECONDS = 3;
+    private static final int SPAWN_PROTECTION_SECONDS = 2;
+
     @Override
     public void handlePlayerDeath(final Player player, final Player killer) {
-        // Detailed respawn and elimination logic will be implemented in the
-        // dedicated task/listener layer. For now we simply mark the player
-        // as spectator; this will be expanded as the MVP is fleshed out.
-        players.remove(player.getUniqueId());
-        spectators.add(player.getUniqueId());
-        player.teleport(spectatorSpawn);
+        final Optional<ITeam> teamOpt = getTeam(player);
+        final boolean bedDestroyed = teamOpt.map(ITeam::isBedDestroyed).orElse(true);
+
+        if (bedDestroyed) {
+            // Eliminated: move to spectators permanently.
+            players.remove(player.getUniqueId());
+            spectators.add(player.getUniqueId());
+            player.teleport(spectatorSpawn);
+            player.setGameMode(GameMode.SPECTATOR);
+            return;
+        }
+
+        // Respawn flow: spectator for 3 seconds, then respawn at base with 2 seconds spawn protection.
+        player.setGameMode(GameMode.SPECTATOR);
+        // Keep in players; do not add to spectators.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> respawnAtBase(player), RESPAWN_SPECTATOR_SECONDS * 20L);
+    }
+
+    /**
+     * Teleports the player to their team spawn, restores health/food, and grants spawn protection.
+     * Call only when the player is in this arena and their team's bed is still up.
+     */
+    private void respawnAtBase(final Player player) {
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) {
+            return;
+        }
+        if (!players.contains(player.getUniqueId())) {
+            return;
+        }
+        final Optional<ITeam> teamOpt = getTeam(player);
+        if (teamOpt.isEmpty() || teamOpt.get().isBedDestroyed()) {
+            // Bed was destroyed during the 3-second wait; eliminate now.
+            players.remove(player.getUniqueId());
+            spectators.add(player.getUniqueId());
+            player.teleport(spectatorSpawn);
+            player.setGameMode(GameMode.SPECTATOR);
+            return;
+        }
+        final ITeam team = teamOpt.get();
+        player.teleport(team.getSpawnLocation());
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.getInventory().clear();
+        giveRespawnKit(player);
+        spawnProtectionUntil.put(player.getUniqueId(), System.currentTimeMillis() + SPAWN_PROTECTION_SECONDS * 1000L);
     }
 
     @Override
@@ -409,10 +483,212 @@ public final class Arena implements IArena {
     public void resetAfterGame() {
         players.clear();
         spectators.clear();
+        spawnProtectionUntil.clear();
+        playerArmorTier.clear();
+        playerAxeTier.clear();
+        playerPickaxeTier.clear();
+        playerHasShears.clear();
         for (ITeam team : teams) {
             team.resetTeam();
         }
         gameState = EGameState.LOBBY_WAITING;
+    }
+
+    // --- Kit state for shop upgrades (armor/axe/pickaxe persist; sword resets on death) ---
+
+    public ArmorTier getPlayerArmorTier(final Player player) {
+        return playerArmorTier.getOrDefault(player.getUniqueId(), ArmorTier.LEATHER);
+    }
+
+    /** Upgrades armor tier only if new tier is higher. Returns true if upgraded. */
+    public boolean setPlayerArmorTier(final Player player, final ArmorTier tier) {
+        final ArmorTier current = getPlayerArmorTier(player);
+        if (tier.ordinal() <= current.ordinal()) {
+            return false;
+        }
+        playerArmorTier.put(player.getUniqueId(), tier);
+        return true;
+    }
+
+    public ToolTier getPlayerAxeTier(final Player player) {
+        return playerAxeTier.getOrDefault(player.getUniqueId(), ToolTier.NONE);
+    }
+
+    public void setPlayerAxeTier(final Player player, final ToolTier tier) {
+        playerAxeTier.put(player.getUniqueId(), tier);
+    }
+
+    public ToolTier getPlayerPickaxeTier(final Player player) {
+        return playerPickaxeTier.getOrDefault(player.getUniqueId(), ToolTier.NONE);
+    }
+
+    public void setPlayerPickaxeTier(final Player player, final ToolTier tier) {
+        playerPickaxeTier.put(player.getUniqueId(), tier);
+    }
+
+    public boolean hasShears(final Player player) {
+        return playerHasShears.contains(player.getUniqueId());
+    }
+
+    public void setPlayerHasShears(final Player player, final boolean has) {
+        if (has) {
+            playerHasShears.add(player.getUniqueId());
+        } else {
+            playerHasShears.remove(player.getUniqueId());
+        }
+    }
+
+    @Override
+    public boolean hasSpawnProtection(final Player player) {
+        final Long until = spawnProtectionUntil.get(player.getUniqueId());
+        if (until == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() >= until) {
+            spawnProtectionUntil.remove(player.getUniqueId());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Cancels the lobby countdown if one is running. Call when cancelling a
+     * game that has not started yet.
+     */
+    public void cancelCountdown() {
+        if (startingTask != null) {
+            startingTask.cancel();
+            startingTask = null;
+        }
+        gameState = EGameState.LOBBY_WAITING;
+    }
+
+    /**
+     * Shuffles all current players and assigns them to teams in round-robin order.
+     * Each player is then added to their team (which teleports them to the team spawn).
+     * Call only when transitioning from lobby/starting to in-game.
+     */
+    private void assignAllPlayersToTeamsRandomly() {
+        final List<Player> playerList = new ArrayList<>(getPlayers());
+        Collections.shuffle(playerList, new Random());
+        final List<ITeam> teamList = new ArrayList<>(teams);
+        if (teamList.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < playerList.size(); i++) {
+            final ITeam team = teamList.get(i % teamList.size());
+            team.addPlayer(playerList.get(i));
+        }
+    }
+
+    private static final Material[] SWORD_MATERIALS = {
+            Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD
+    };
+
+    private static boolean isSword(final Material type) {
+        for (Material m : SWORD_MATERIALS) {
+            if (m == type) return true;
+        }
+        return false;
+    }
+
+    private static boolean isPermanentArmor(final ItemStack stack) {
+        if (stack == null || stack.getType() == Material.AIR) return false;
+        return stack.getType().name().endsWith("_HELMET") || stack.getType().name().endsWith("_CHESTPLATE")
+                || stack.getType().name().endsWith("_LEGGINGS") || stack.getType().name().endsWith("_BOOTS");
+    }
+
+    /** Gives wooden sword and full leather armor (team-colored chest/helmet). Axe/pickaxe are shop-only. */
+    private void giveStarterKit(final Player player) {
+        final UUID uuid = player.getUniqueId();
+        playerArmorTier.put(uuid, ArmorTier.LEATHER);
+        playerAxeTier.put(uuid, ToolTier.NONE);
+        playerPickaxeTier.put(uuid, ToolTier.NONE);
+        playerHasShears.remove(uuid);
+
+        player.getInventory().clear();
+        player.getInventory().setItem(0, unbreakable(new ItemStack(Material.WOODEN_SWORD)));
+        applyArmor(player);
+    }
+
+    /** After death: wooden sword, armor (from tier), axe/pickaxe only if purchased (degraded), shears if owned. */
+    private void giveRespawnKit(final Player player) {
+        final UUID uuid = player.getUniqueId();
+        ToolTier axeTier = getPlayerAxeTier(player).degradeAxe();
+        ToolTier pickTier = getPlayerPickaxeTier(player).degradePickaxe();
+        playerAxeTier.put(uuid, axeTier);
+        playerPickaxeTier.put(uuid, pickTier);
+
+        player.getInventory().setItem(0, unbreakable(new ItemStack(Material.WOODEN_SWORD)));
+        applyArmor(player);
+        if (axeTier.hasTool()) {
+            player.getInventory().addItem(unbreakable(new ItemStack(axeTier.getAxeMaterial())));
+        }
+        if (pickTier.hasTool()) {
+            player.getInventory().addItem(unbreakable(new ItemStack(pickTier.getPickaxeMaterial())));
+        }
+        if (playerHasShears.contains(uuid)) {
+            player.getInventory().addItem(unbreakable(new ItemStack(Material.SHEARS)));
+        }
+    }
+
+    private void applyArmor(final Player player) {
+        final Optional<ITeam> teamOpt = getTeam(player);
+        final ETeamColor color = teamOpt.map(ITeam::getColor).orElse(ETeamColor.WHITE);
+        final ArmorTier tier = getPlayerArmorTier(player);
+
+        final ItemStack chest = unbreakable(new ItemStack(Material.LEATHER_CHESTPLATE));
+        final ItemStack helmet = unbreakable(new ItemStack(Material.LEATHER_HELMET));
+        setLeatherColor(chest, color);
+        setLeatherColor(helmet, color);
+
+        final ItemStack legs = unbreakable(new ItemStack(tier.getLeggings()));
+        final ItemStack boots = unbreakable(new ItemStack(tier.getBoots()));
+
+        player.getInventory().setChestplate(chest);
+        player.getInventory().setHelmet(helmet);
+        player.getInventory().setLeggings(legs);
+        player.getInventory().setBoots(boots);
+    }
+
+    private static void setLeatherColor(final ItemStack stack, final ETeamColor color) {
+        final ItemMeta meta = stack.getItemMeta();
+        if (meta instanceof LeatherArmorMeta lam) {
+            lam.setColor(color.getDyeColor().getColor());
+            stack.setItemMeta(lam);
+        }
+    }
+
+    private static ItemStack unbreakable(final ItemStack stack) {
+        final ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setUnbreakable(true);
+            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_UNBREAKABLE, org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    /** Ensures player has at least one sword; if none, adds wooden. Call from enforcement task/listener. */
+    public void ensureSword(final Player player) {
+        int count = 0;
+        for (ItemStack s : player.getInventory().getContents()) {
+            if (s != null && isSword(s.getType())) count += s.getAmount();
+        }
+        if (count < 1) {
+            player.getInventory().addItem(unbreakable(new ItemStack(Material.WOODEN_SWORD)));
+        }
+    }
+
+    /** Re-applies permanent armor (chest/helmet team color, legs/boots from tier). Call when armor was removed. */
+    public void reapplyArmorIfNeeded(final Player player) {
+        if (!players.contains(player.getUniqueId()) && !spectators.contains(player.getUniqueId())) {
+            return;
+        }
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) {
+            return;
+        }
+        applyArmor(player);
     }
 
     private void clearLobbyRegion() {

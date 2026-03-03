@@ -50,20 +50,36 @@ public final class ListSubCommand extends ASubCommand {
             sender.sendMessage(ChatColor.AQUA + "- " + arena.getId() + ChatColor.GRAY + " (" + arena.getDisplayName() + ")" +
                     ChatColor.DARK_GRAY + " [" + state.name() + ", " + playerCount + " players]");
 
-            for (ITeam team : arena.getTeams()) {
-                final String bedStatus = team.isBedDestroyed() ? ChatColor.RED + "✖" : ChatColor.GREEN + "✔";
-                final StringBuilder members = new StringBuilder();
+            final boolean inLobby = state == EGameState.LOBBY_WAITING || state == EGameState.STARTING;
+            if (inLobby) {
+                // No teams yet: list all players in dark gray.
+                final StringBuilder list = new StringBuilder();
                 boolean first = true;
-                for (Player member : team.getOnlineMembers()) {
+                for (Player p : arena.getPlayers()) {
                     if (!first) {
-                        members.append(ChatColor.DARK_GRAY).append(", ");
+                        list.append(ChatColor.DARK_GRAY).append(", ");
                     }
-                    members.append(team.getColor().getChatColor()).append(member.getName());
+                    list.append(ChatColor.DARK_GRAY).append(p.getName());
                     first = false;
                 }
-                sender.sendMessage("  " + team.getColor().getChatColor() + team.getId()
-                        + ChatColor.DARK_GRAY + " [Bed: " + bedStatus + ChatColor.DARK_GRAY + "] "
-                        + (members.length() > 0 ? members.toString() : ChatColor.DARK_GRAY + "(no online players)"));
+                sender.sendMessage("  " + (list.length() > 0 ? list.toString() : ChatColor.DARK_GRAY + "(no players)"));
+            } else {
+                // In-game: list by team with team-colored names and bed status.
+                for (ITeam team : arena.getTeams()) {
+                    final String bedStatus = team.isBedDestroyed() ? ChatColor.RED + "✖" : ChatColor.GREEN + "✔";
+                    final StringBuilder members = new StringBuilder();
+                    boolean first = true;
+                    for (Player member : team.getOnlineMembers()) {
+                        if (!first) {
+                            members.append(ChatColor.DARK_GRAY).append(", ");
+                        }
+                        members.append(team.getColor().getChatColor()).append(member.getName());
+                        first = false;
+                    }
+                    sender.sendMessage("  " + team.getColor().getChatColor() + team.getId()
+                            + ChatColor.DARK_GRAY + " [Bed: " + bedStatus + ChatColor.DARK_GRAY + "] "
+                            + (members.length() > 0 ? members.toString() : ChatColor.DARK_GRAY + "(no online players)"));
+                }
             }
         }
 

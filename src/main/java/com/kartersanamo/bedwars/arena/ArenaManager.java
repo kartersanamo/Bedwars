@@ -105,6 +105,8 @@ public final class ArenaManager {
                 internalAdapter.snapshotArena(arena, snapshotRegion);
             }
 
+            final int teamSize = arena.getTeamSize();
+
             // Create generators and spawn shop NPCs from configuration.
             for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
                 for (Location loc : teamDef.getIronGenerators()) {
@@ -113,7 +115,7 @@ public final class ArenaManager {
                             EGeneratorType.IRON,
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getIronIntervalTicks(),
-                            generatorsConfig.getIronMaxItems()
+                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON)
                     ));
                 }
                 for (Location loc : teamDef.getGoldGenerators()) {
@@ -122,7 +124,7 @@ public final class ArenaManager {
                             EGeneratorType.GOLD,
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getGoldIntervalTicks(),
-                            generatorsConfig.getGoldMaxItems()
+                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD)
                     ));
                 }
 
@@ -147,7 +149,7 @@ public final class ArenaManager {
                         EGeneratorType.DIAMOND,
                         new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getDiamondIntervalTicks(),
-                        generatorsConfig.getDiamondMaxItems()
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.DIAMOND)
                 ));
             }
 
@@ -157,7 +159,7 @@ public final class ArenaManager {
                         EGeneratorType.EMERALD,
                         new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getEmeraldIntervalTicks(),
-                        generatorsConfig.getEmeraldMaxItems()
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.EMERALD)
                 ));
             }
 

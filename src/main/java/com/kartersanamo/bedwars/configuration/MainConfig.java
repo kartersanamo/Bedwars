@@ -35,6 +35,29 @@ public final class MainConfig {
         configuration.addDefault(ConfigPath.Main.GAME_RESPAWN_DELAY_SECONDS, 5);
         configuration.addDefault(ConfigPath.Main.GAME_VOID_Y, 0);
 
+        // Default generator caps per game mode (can be overridden in config.yml).
+        // Values are per-generator item caps on the ground.
+        // Solo
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_IRON, 48);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_DIAMOND, 4);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_EMERALD, 2);
+        // Doubles
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_IRON, 48);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_DIAMOND, 4);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_EMERALD, 2);
+        // Threes
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_IRON, 48);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_DIAMOND, 4);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_EMERALD, 2);
+        // Fours
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_IRON, 48);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_DIAMOND, 4);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_EMERALD, 2);
+
         configuration.addDefault(ConfigPath.Main.DATABASE_TYPE, "sqlite");
         configuration.addDefault(ConfigPath.Main.DATABASE_SQLITE_FILE, "bedwars.db");
 
@@ -93,6 +116,41 @@ public final class MainConfig {
 
     public int getVoidY() {
         return configuration.getInt(ConfigPath.Main.GAME_VOID_Y, 0);
+    }
+
+    public int getGeneratorMaxItems(final int teamSize, final com.kartersanamo.bedwars.api.arena.generator.EGeneratorType type) {
+        final String path;
+        if (teamSize <= 1) {
+            path = switch (type) {
+                case IRON -> ConfigPath.Main.GENERATOR_CAPS_SOLO_IRON;
+                case GOLD -> ConfigPath.Main.GENERATOR_CAPS_SOLO_GOLD;
+                case DIAMOND -> ConfigPath.Main.GENERATOR_CAPS_SOLO_DIAMOND;
+                case EMERALD -> ConfigPath.Main.GENERATOR_CAPS_SOLO_EMERALD;
+            };
+        } else if (teamSize == 2) {
+            path = switch (type) {
+                case IRON -> ConfigPath.Main.GENERATOR_CAPS_DOUBLES_IRON;
+                case GOLD -> ConfigPath.Main.GENERATOR_CAPS_DOUBLES_GOLD;
+                case DIAMOND -> ConfigPath.Main.GENERATOR_CAPS_DOUBLES_DIAMOND;
+                case EMERALD -> ConfigPath.Main.GENERATOR_CAPS_DOUBLES_EMERALD;
+            };
+        } else if (teamSize == 3) {
+            path = switch (type) {
+                case IRON -> ConfigPath.Main.GENERATOR_CAPS_THREES_IRON;
+                case GOLD -> ConfigPath.Main.GENERATOR_CAPS_THREES_GOLD;
+                case DIAMOND -> ConfigPath.Main.GENERATOR_CAPS_THREES_DIAMOND;
+                case EMERALD -> ConfigPath.Main.GENERATOR_CAPS_THREES_EMERALD;
+            };
+        } else {
+            // 4 or more players per team use fours config.
+            path = switch (type) {
+                case IRON -> ConfigPath.Main.GENERATOR_CAPS_FOURS_IRON;
+                case GOLD -> ConfigPath.Main.GENERATOR_CAPS_FOURS_GOLD;
+                case DIAMOND -> ConfigPath.Main.GENERATOR_CAPS_FOURS_DIAMOND;
+                case EMERALD -> ConfigPath.Main.GENERATOR_CAPS_FOURS_EMERALD;
+            };
+        }
+        return configuration.getInt(path);
     }
 
     public String getDatabaseType() {

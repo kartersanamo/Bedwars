@@ -29,5 +29,6 @@ public final class OneTickGenerators extends BukkitRunnable {
                 generator.tick(tickCounter);
             }
         }
+        plugin.getHologramManager().update(tickCounter);
     }
 }

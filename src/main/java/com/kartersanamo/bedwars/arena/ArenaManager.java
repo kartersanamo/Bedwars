@@ -34,16 +34,22 @@ public final class ArenaManager {
     private final MainConfig mainConfig;
     private final GeneratorsConfig generatorsConfig;
     private final InternalAdapter internalAdapter;
+    private final GeneratorItemTracker generatorItemTracker;
     private final Logger logger;
 
     private final Map<String, IArena> arenasById = new HashMap<>();
     private final Map<UUID, IArena> arenaByPlayer = new HashMap<>();
 
     public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter) {
+        this(plugin, mainConfig, generatorsConfig, internalAdapter, null);
+    }
+
+    public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter, final GeneratorItemTracker generatorItemTracker) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.mainConfig = Objects.requireNonNull(mainConfig, "mainConfig");
         this.generatorsConfig = Objects.requireNonNull(generatorsConfig, "generatorsConfig");
         this.internalAdapter = Objects.requireNonNull(internalAdapter, "internalAdapter");
+        this.generatorItemTracker = generatorItemTracker;
         this.logger = plugin.getLogger();
     }
 
@@ -119,7 +125,8 @@ public final class ArenaManager {
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getIronIntervalTicks(),
                             mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON),
-                            forwardTarget
+                            forwardTarget,
+                            generatorItemTracker
                     ));
                 }
                 for (Location loc : teamDef.getGoldGenerators()) {
@@ -129,7 +136,8 @@ public final class ArenaManager {
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getGoldIntervalTicks(),
                             mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD),
-                            forwardTarget
+                            forwardTarget,
+                            generatorItemTracker
                     ));
                 }
 
@@ -142,25 +150,24 @@ public final class ArenaManager {
                         villager.setCollidable(false);
                         villager.setInvulnerable(true);
                         villager.setSilent(true);
-                        villager.setCustomNameVisible(true);
-                        villager.setCustomName(teamDef.getColor().getChatColor() + "Item Shop");
-                    });
+                        villager.setCustomNameVisible(false);
+                         });
                     final double x = npcLoc.getX();
                     final double y = npcLoc.getY();
                     final double z = npcLoc.getZ();
-                    world.spawn(new Location(world, x, y + 2.0, z), ArmorStand.class, stand -> {
+                    world.spawn(new Location(world, x, y + 2.25, z), ArmorStand.class, stand -> {
                         stand.setMarker(true);
                         stand.setInvisible(true);
                         stand.setGravity(false);
                         stand.setCustomNameVisible(true);
-                        stand.setCustomName(ChatColor.GREEN + "ITEM SHOP");
+                        stand.setCustomName(ChatColor.AQUA + "ITEM SHOP");
                     });
-                    world.spawn(new Location(world, x, y + 1.75, z), ArmorStand.class, stand -> {
+                    world.spawn(new Location(world, x, y + 2, z), ArmorStand.class, stand -> {
                         stand.setMarker(true);
                         stand.setInvisible(true);
                         stand.setGravity(false);
                         stand.setCustomNameVisible(true);
-                        stand.setCustomName(ChatColor.GOLD + "RIGHT CLICK");
+                        stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
                     });
                 }
 
@@ -202,7 +209,9 @@ public final class ArenaManager {
                         EGeneratorType.DIAMOND,
                         new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getDiamondIntervalTicks(),
-                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.DIAMOND)
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.DIAMOND),
+                        null,
+                        generatorItemTracker
                 ));
             }
 
@@ -212,7 +221,9 @@ public final class ArenaManager {
                         EGeneratorType.EMERALD,
                         new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                         generatorsConfig.getEmeraldIntervalTicks(),
-                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.EMERALD)
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.EMERALD),
+                        null,
+                        generatorItemTracker
                 ));
             }
 

@@ -1,14 +1,9 @@
 package com.kartersanamo.bedwars.arena.tasks;
 
-import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import com.kartersanamo.bedwars.api.arena.team.ITeam;
-import org.bukkit.entity.Player;
+import com.kartersanamo.bedwars.arena.Arena;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Periodically checks win conditions while the game is running.
@@ -27,27 +22,8 @@ public final class GamePlayingTask extends BukkitRunnable {
             cancel();
             return;
         }
-
-        final List<ITeam> aliveTeams = arena.getTeams().stream()
-                .filter(team -> !team.isEliminated())
-                .collect(Collectors.toList());
-
-        if (aliveTeams.size() <= 1) {
-            arena.setGameState(EGameState.ENDING);
-            final ITeam winningTeam = aliveTeams.isEmpty() ? null : aliveTeams.get(0);
-            arena.broadcastGameOverSummary(winningTeam);
-
-            if (winningTeam != null) {
-                for (Player player : winningTeam.getOnlineMembers()) {
-                    player.sendTitle("Victory!", "", 10, 60, 10);
-                }
-            }
-
-            // Schedule arena reset after a short delay.
-            new GameRestartingTask(Bedwars.getInstance(), arena, 10)
-                    .runTaskTimer(Bedwars.getInstance(), 20L, 20L);
-
-            cancel();
+        if (arena instanceof Arena concreteArena) {
+            concreteArena.checkGameOver();
         }
     }
 }

@@ -61,14 +61,22 @@ public final class DeathListener implements Listener {
         updateDeathStats(plugin, arena, victim, killer);
         if (killer != null && killer != victim) {
             arena.recordKill(killer.getUniqueId());
+            final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
+            if (finalKill) {
+                arena.recordFinalKill(killer.getUniqueId());
+            }
             broadcastKillMessage(arena, victim, killer);
         }
     }
 
     private static void broadcastKillMessage(final IArena arena, final Player victim, final Player killer) {
         final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
-        final String message = ChatColor.RED + victim.getName() + ChatColor.WHITE + " was killed by " + killer.getName() + "."
-                + (finalKill ? " " + ChatColor.AQUA.toString() + ChatColor.BOLD + "FINAL KILL!" : "");
+        ChatColor victimColor = ChatColor.WHITE;
+        ChatColor killerColor = ChatColor.WHITE;
+        if (arena.getTeam(victim).isPresent()) victimColor = arena.getTeam(victim).get().getColor().getChatColor();
+        if (arena.getTeam(killer).isPresent()) killerColor = arena.getTeam(killer).get().getColor().getChatColor();
+        final String message = victimColor + victim.getName() + ChatColor.GRAY + " was killed by " + killerColor + killer.getName() + "."
+                + (finalKill ? " " + ChatColor.AQUA + ChatColor.BOLD + "FINAL KILL!" : "");
         for (Player p : arena.getPlayers()) {
             p.sendMessage(message);
         }

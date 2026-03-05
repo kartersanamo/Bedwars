@@ -3,6 +3,7 @@ package com.kartersanamo.bedwars;
 import com.kartersanamo.bedwars.api.IBedwars;
 import com.kartersanamo.bedwars.api.configuration.ConfigManager;
 import com.kartersanamo.bedwars.arena.ArenaManager;
+import com.kartersanamo.bedwars.arena.GeneratorItemTracker;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.SoundsConfig;
@@ -25,6 +26,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     private Database database;
     private ArenaManager arenaManager;
+    private GeneratorItemTracker generatorItemTracker;
     private InternalAdapter internalAdapter;
     private com.kartersanamo.bedwars.shop.ShopManager shopManager;
     private com.kartersanamo.bedwars.upgrades.UpgradeManager upgradeManager;
@@ -43,6 +45,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         this.soundsConfig = new SoundsConfig(configManager);
 
         this.internalAdapter = new InternalAdapter();
+        this.generatorItemTracker = new GeneratorItemTracker(this);
         this.shopManager = new com.kartersanamo.bedwars.shop.ShopManager();
         this.upgradeManager = new com.kartersanamo.bedwars.upgrades.UpgradeManager();
         this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
@@ -64,6 +67,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.gui.GameModeGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.SwordAndArmorEnforcementListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.HungerListener(this), this);
+        getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
         final com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand bedwarsCommand =
                 new com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand();
@@ -83,6 +87,16 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         // Apply Haste and Heal Pool every 2 seconds.
         new com.kartersanamo.bedwars.arena.tasks.UpgradesApplyTask(this, arenaManager)
                 .runTaskTimer(this, 40L, 40L);
+
+        // Clean up generator item tracker for merged/despawned items (every 5 seconds).
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override
+            public void run() {
+                if (generatorItemTracker != null) {
+                    generatorItemTracker.cleanupRemovedEntities();
+                }
+            }
+        }.runTaskTimer(this, 100L, 100L);
 
     }
 
@@ -114,7 +128,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     }
 
     private void initialiseArenas() {
-        this.arenaManager = new ArenaManager(this, mainConfig, generatorsConfig, internalAdapter);
+        this.arenaManager = new ArenaManager(this, mainConfig, generatorsConfig, internalAdapter, generatorItemTracker);
         arenaManager.loadArenas();
 
         if (arenaManager.getArenas().isEmpty()) {

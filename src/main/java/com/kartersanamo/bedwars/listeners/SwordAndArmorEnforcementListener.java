@@ -9,6 +9,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -92,20 +93,14 @@ public final class SwordAndArmorEnforcementListener implements Listener {
         final Inventory top = event.getView().getTopInventory();
         final ItemStack current = event.getCurrentItem();
         final ItemStack cursor = event.getCursor();
+        final boolean isArmorSlot = event.getView().getSlotType(rawSlot) == InventoryType.SlotType.ARMOR;
 
-        // Armor slots in player inventory (bottom): 5=helmet, 6=chest, 7=legs, 8=boots (standard 0-8 hotbar, 9-35 main, 36-39 armor)
-        // In the view, bottom inventory is the player inventory. Slot 36-39 in bottom = armor.
-        final int sizeTop = top.getSize();
-        final boolean clickInPlayerInv = rawSlot >= sizeTop;
-        final int playerSlot = clickInPlayerInv ? rawSlot - sizeTop : -1;
-        final boolean isArmorSlot = playerSlot >= 36 && playerSlot <= 39;
-
-        // Prevent any move that would take permanent armor off (cancel only; never reapply to avoid duplication)
+        // Prevent any move that would take permanent armor off (works for any inventory view, e.g. E menu or chest)
         if (current != null && isPermanentArmor(current) && (isArmorSlot || isArmorSlotOf(current, player.getInventory()))) {
             event.setCancelled(true);
             return;
         }
-        if (cursor != null && isPermanentArmor(cursor) && (!clickInPlayerInv || playerSlot < 36 || playerSlot > 39)) {
+        if (cursor != null && isPermanentArmor(cursor) && !isArmorSlot) {
             event.setCancelled(true);
             return;
         }
@@ -140,17 +135,11 @@ public final class SwordAndArmorEnforcementListener implements Listener {
         final String title = event.getView().getTitle();
         if (title != null && (title.startsWith("Item Shop") || title.startsWith("Upgrades & Traps"))) return;
 
-        final int sizeTop = event.getView().getTopInventory().getSize();
-        final ItemStack dragged = event.getOldCursor();
-        if (dragged == null || !isPermanentArmor(dragged)) return;
-
         for (int rawSlot : event.getRawSlots()) {
-            if (rawSlot >= sizeTop) {
-                final int playerSlot = rawSlot - sizeTop;
-                if (playerSlot >= 36 && playerSlot <= 39) {
-                    event.setCancelled(true);
-                    return;
-                }
+            final ItemStack item = event.getView().getItem(rawSlot);
+            if (item != null && isPermanentArmor(item)) {
+                event.setCancelled(true);
+                return;
             }
         }
     }

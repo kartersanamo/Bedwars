@@ -36,25 +36,26 @@ public final class MainConfig {
         configuration.addDefault(ConfigPath.Main.GAME_VOID_Y, 0);
 
         // Default generator caps per game mode (can be overridden in config.yml).
-        // Values are per-generator item caps on the ground.
+        // Max dropped items per generator on the ground; when reached, generator stops until items are picked up.
+        // Spawn island (iron/gold): 48 iron, 12 gold per generator. Mid: 4 diamonds, 2 emeralds per generator.
         // Solo
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_IRON, 48);
-        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_GOLD, 12);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_DIAMOND, 4);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_SOLO_EMERALD, 2);
         // Doubles
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_IRON, 48);
-        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_GOLD, 12);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_DIAMOND, 4);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_DOUBLES_EMERALD, 2);
         // Threes
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_IRON, 48);
-        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_GOLD, 12);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_DIAMOND, 4);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_THREES_EMERALD, 2);
         // Fours
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_IRON, 48);
-        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_GOLD, 8);
+        configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_GOLD, 12);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_DIAMOND, 4);
         configuration.addDefault(ConfigPath.Main.GENERATOR_CAPS_FOURS_EMERALD, 2);
 

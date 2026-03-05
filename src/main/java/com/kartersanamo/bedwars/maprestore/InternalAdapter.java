@@ -6,12 +6,13 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -84,17 +85,22 @@ public final class InternalAdapter {
 
     /**
      * Restores all modified blocks in the arena region back to their snapshot state.
+     * Also removes all dropped items (Item entities) within the snapshot region.
      */
     public void restoreArena(final IArena arena) {
         final Map<BlockPosition, BlockData> snapshot = arenaSnapshots.get(arena.getId());
         final Set<BlockPosition> modified = modifiedBlocks.get(arena.getId());
 
-        if (snapshot == null || modified == null || snapshot.isEmpty() || modified.isEmpty()) {
+        final World world = arena.getWorld();
+        if (world == null) {
             return;
         }
 
-        final World world = arena.getWorld();
-        if (world == null) {
+        if (snapshot != null && !snapshot.isEmpty()) {
+            clearDroppedItemsInSnapshotBounds(world, snapshot.keySet());
+        }
+
+        if (snapshot == null || modified == null || modified.isEmpty()) {
             return;
         }
 
@@ -108,6 +114,31 @@ public final class InternalAdapter {
         }
 
         modified.clear();
+    }
+
+    private void clearDroppedItemsInSnapshotBounds(final World world, final Set<BlockPosition> positions) {
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPosition p : positions) {
+            minX = Math.min(minX, p.x());
+            minY = Math.min(minY, p.y());
+            minZ = Math.min(minZ, p.z());
+            maxX = Math.max(maxX, p.x());
+            maxY = Math.max(maxY, p.y());
+            maxZ = Math.max(maxZ, p.z());
+        }
+        for (Entity entity : world.getEntities()) {
+            if (!(entity instanceof Item)) {
+                continue;
+            }
+            final Location loc = entity.getLocation();
+            final int bx = loc.getBlockX();
+            final int by = loc.getBlockY();
+            final int bz = loc.getBlockZ();
+            if (bx >= minX && bx <= maxX && by >= minY && by <= maxY && bz >= minZ && bz <= maxZ) {
+                entity.remove();
+            }
+        }
     }
 
     private static Location min(final Location a, final Location b) {

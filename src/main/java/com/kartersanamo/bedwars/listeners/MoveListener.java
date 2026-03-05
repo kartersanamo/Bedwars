@@ -1,7 +1,10 @@
 package com.kartersanamo.bedwars.listeners;
 
 import com.kartersanamo.bedwars.Bedwars;
+import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.arena.Arena;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -26,10 +29,22 @@ public final class MoveListener implements Listener {
             return;
         }
 
+        if (arena.getGameState() != EGameState.IN_GAME && arena.getGameState() != EGameState.ENDING) {
+            return;
+        }
+        if (arena instanceof Arena concreteArena) {
+            concreteArena.checkTrapTrigger(player);
+        }
         final int voidY = plugin.getMainConfig().getVoidY();
         if (player.getLocation().getY() < voidY) {
-            // Trigger a standard death; the DeathListener will take over.
-            player.setHealth(0.0D);
+            final String voidMessage = ChatColor.RED + player.getName() + ChatColor.GRAY + " fell into the void.";
+            for (Player p : arena.getPlayers()) {
+                p.sendMessage(voidMessage);
+            }
+            for (Player p : arena.getSpectators()) {
+                p.sendMessage(voidMessage);
+            }
+            DeathListener.handleArenaDeath(plugin, player, null, arena);
         }
     }
 }

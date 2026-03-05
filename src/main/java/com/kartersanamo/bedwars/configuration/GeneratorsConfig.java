@@ -35,6 +35,18 @@ public final class GeneratorsConfig {
         configuration.addDefault(ConfigPath.Generators.EMERALD_INTERVAL_TICKS, 1200);
         configuration.addDefault(ConfigPath.Generators.EMERALD_MAX_ITEMS, 16);
 
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_2, 300);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_2, 480);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_3, 660);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_3, 840);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_BED_BREAK, 900);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_SUDDEN_DEATH, 960);
+
+        configuration.addDefault(ConfigPath.Generators.DIAMOND_TIER_2_INTERVAL_TICKS, 400);
+        configuration.addDefault(ConfigPath.Generators.DIAMOND_TIER_3_INTERVAL_TICKS, 200);
+        configuration.addDefault(ConfigPath.Generators.EMERALD_TIER_2_INTERVAL_TICKS, 800);
+        configuration.addDefault(ConfigPath.Generators.EMERALD_TIER_3_INTERVAL_TICKS, 400);
+
         configuration.options().copyDefaults(true);
     }
 
@@ -68,5 +80,45 @@ public final class GeneratorsConfig {
 
     public int getEmeraldMaxItems() {
         return configuration.getInt(ConfigPath.Generators.EMERALD_MAX_ITEMS, 16);
+    }
+
+    public int getTierUpgradeDiamond2Seconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_2, 300);
+    }
+
+    public int getTierUpgradeEmerald2Seconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_EMERALD_2, 480);
+    }
+
+    public int getTierUpgradeDiamond3Seconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_3, 660);
+    }
+
+    public int getTierUpgradeEmerald3Seconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_EMERALD_3, 840);
+    }
+
+    public int getTierUpgradeBedBreakSeconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_BED_BREAK, 900);
+    }
+
+    public int getTierUpgradeSuddenDeathSeconds() {
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_SUDDEN_DEATH, 960);
+    }
+
+    public int getDiamondTier2IntervalTicks() {
+        return configuration.getInt(ConfigPath.Generators.DIAMOND_TIER_2_INTERVAL_TICKS, 400);
+    }
+
+    public int getDiamondTier3IntervalTicks() {
+        return configuration.getInt(ConfigPath.Generators.DIAMOND_TIER_3_INTERVAL_TICKS, 200);
+    }
+
+    public int getEmeraldTier2IntervalTicks() {
+        return configuration.getInt(ConfigPath.Generators.EMERALD_TIER_2_INTERVAL_TICKS, 800);
+    }
+
+    public int getEmeraldTier3IntervalTicks() {
+        return configuration.getInt(ConfigPath.Generators.EMERALD_TIER_3_INTERVAL_TICKS, 400);
     }
 }

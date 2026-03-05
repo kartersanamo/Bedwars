@@ -66,6 +66,13 @@ teams:
       z: 0.5
       yaw: 90.0
       pitch: 0.0
+    upgrade-npc:
+      world: bedwars_world
+      x: 27.5
+      y: 65.0
+      z: 0.5
+      yaw: 90.0
+      pitch: 0.0
 
   BLUE:
     color: BLUE
@@ -102,6 +109,13 @@ teams:
     shop-npc:
       world: bedwars_world
       x: -28.5
+      y: 65.0
+      z: 0.5
+      yaw: -90.0
+      pitch: 0.0
+    upgrade-npc:
+      world: bedwars_world
+      x: -27.5
       y: 65.0
       z: 0.5
       yaw: -90.0

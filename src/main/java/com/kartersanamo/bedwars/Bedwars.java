@@ -27,6 +27,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private ArenaManager arenaManager;
     private InternalAdapter internalAdapter;
     private com.kartersanamo.bedwars.shop.ShopManager shopManager;
+    private com.kartersanamo.bedwars.upgrades.UpgradeManager upgradeManager;
     private com.kartersanamo.bedwars.sidebar.SidebarService sidebarService;
     private com.kartersanamo.bedwars.hologram.HologramManager hologramManager;
 
@@ -43,7 +44,8 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
         this.internalAdapter = new InternalAdapter();
         this.shopManager = new com.kartersanamo.bedwars.shop.ShopManager();
-        this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService();
+        this.upgradeManager = new com.kartersanamo.bedwars.upgrades.UpgradeManager();
+        this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
         this.hologramManager = new com.kartersanamo.bedwars.hologram.HologramManager(this);
 
         initialiseDatabase();
@@ -55,11 +57,13 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DamageListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.ChatListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopOpenListener(shopManager), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopOpenListener(this, shopManager, upgradeManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener(this, shopManager), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener(upgradeManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.sidebar.SidebarListener(sidebarService), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.gui.GameModeGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.SwordAndArmorEnforcementListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.HungerListener(this), this);
 
         final com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand bedwarsCommand =
                 new com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand();
@@ -75,6 +79,10 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         // Start sidebar refresh task (once per second).
         new com.kartersanamo.bedwars.sidebar.SidebarUpdateTask(this, sidebarService)
                 .runTaskTimer(this, 20L, 20L);
+
+        // Apply Haste and Heal Pool every 2 seconds.
+        new com.kartersanamo.bedwars.arena.tasks.UpgradesApplyTask(this, arenaManager)
+                .runTaskTimer(this, 40L, 40L);
 
     }
 

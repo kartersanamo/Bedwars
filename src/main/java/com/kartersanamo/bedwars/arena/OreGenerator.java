@@ -9,15 +9,19 @@ import org.bukkit.entity.Item;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Basic implementation of a resource generator.
+ * Iron and gold generators may have a forward target (team spawn) for block-placement protection.
  */
 public final class OreGenerator implements IGenerator {
 
     private final IArena arena;
     private final EGeneratorType type;
     private final Location location;
+
+    private final Location forwardTarget;
 
     private final int intervalTicks;
     private final int maxItems;
@@ -29,11 +33,28 @@ public final class OreGenerator implements IGenerator {
                         final Location location,
                         final int intervalTicks,
                         final int maxItems) {
+        this(arena, type, location, intervalTicks, maxItems, null);
+    }
+
+    public OreGenerator(final IArena arena,
+                        final EGeneratorType type,
+                        final Location location,
+                        final int intervalTicks,
+                        final int maxItems,
+                        final Location forwardTarget) {
         this.arena = Objects.requireNonNull(arena, "arena");
         this.type = Objects.requireNonNull(type, "type");
         this.location = Objects.requireNonNull(location, "location").clone();
         this.intervalTicks = intervalTicks;
         this.maxItems = maxItems;
+        this.forwardTarget = forwardTarget != null ? forwardTarget.clone() : null;
+    }
+
+    /**
+     * For iron/gold generators, the location (e.g. team spawn) that defines "forward" for protection.
+     */
+    public Optional<Location> getForwardTarget() {
+        return forwardTarget == null ? Optional.empty() : Optional.of(forwardTarget.clone());
     }
 
     @Override
@@ -55,17 +76,27 @@ public final class OreGenerator implements IGenerator {
         return intervalTicks;
     }
 
+    private int getEffectiveIntervalTicks() {
+        if (type == EGeneratorType.DIAMOND || type == EGeneratorType.EMERALD) {
+            return type == EGeneratorType.DIAMOND
+                    ? arena.getEffectiveDiamondIntervalTicks()
+                    : arena.getEffectiveEmeraldIntervalTicks();
+        }
+        return intervalTicks;
+    }
+
     public long getLastDropTick() {
         return lastDropTick;
     }
 
     @Override
     public void tick(final long currentTick) {
-        if (intervalTicks <= 0) {
+        final int effectiveInterval = getEffectiveIntervalTicks();
+        if (effectiveInterval <= 0) {
             return;
         }
 
-        if (currentTick - lastDropTick < intervalTicks) {
+        if (currentTick - lastDropTick < effectiveInterval) {
             return;
         }
 
@@ -79,6 +110,7 @@ public final class OreGenerator implements IGenerator {
                 .count();
 
         if (nearbyCount >= maxItems) {
+            lastDropTick = currentTick;
             return;
         }
 

@@ -7,11 +7,12 @@ import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
-import com.kartersanamo.bedwars.arena.OreGenerator;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -109,13 +110,16 @@ public final class ArenaManager {
 
             // Create generators and spawn shop NPCs from configuration.
             for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
+                final Location forwardTarget = new Location(world,
+                        teamDef.getSpawn().getX(), teamDef.getSpawn().getY(), teamDef.getSpawn().getZ());
                 for (Location loc : teamDef.getIronGenerators()) {
                     arena.addGenerator(new OreGenerator(
                             arena,
                             EGeneratorType.IRON,
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getIronIntervalTicks(),
-                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON)
+                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON),
+                            forwardTarget
                     ));
                 }
                 for (Location loc : teamDef.getGoldGenerators()) {
@@ -124,7 +128,8 @@ public final class ArenaManager {
                             EGeneratorType.GOLD,
                             new Location(world, loc.getX(), loc.getY(), loc.getZ()),
                             generatorsConfig.getGoldIntervalTicks(),
-                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD)
+                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD),
+                            forwardTarget
                     ));
                 }
 
@@ -139,6 +144,54 @@ public final class ArenaManager {
                         villager.setSilent(true);
                         villager.setCustomNameVisible(true);
                         villager.setCustomName(teamDef.getColor().getChatColor() + "Item Shop");
+                    });
+                    final double x = npcLoc.getX();
+                    final double y = npcLoc.getY();
+                    final double z = npcLoc.getZ();
+                    world.spawn(new Location(world, x, y + 2.0, z), ArmorStand.class, stand -> {
+                        stand.setMarker(true);
+                        stand.setInvisible(true);
+                        stand.setGravity(false);
+                        stand.setCustomNameVisible(true);
+                        stand.setCustomName(ChatColor.GREEN + "ITEM SHOP");
+                    });
+                    world.spawn(new Location(world, x, y + 1.75, z), ArmorStand.class, stand -> {
+                        stand.setMarker(true);
+                        stand.setInvisible(true);
+                        stand.setGravity(false);
+                        stand.setCustomNameVisible(true);
+                        stand.setCustomName(ChatColor.GOLD + "RIGHT CLICK");
+                    });
+                }
+
+                final Location upgradeNpcLocation = teamDef.getUpgradeNpc();
+                if (upgradeNpcLocation != null && upgradeNpcLocation.getWorld() != null) {
+                    final Location upgLoc = new Location(world, upgradeNpcLocation.getX(), upgradeNpcLocation.getY(),
+                            upgradeNpcLocation.getZ(), upgradeNpcLocation.getYaw(), upgradeNpcLocation.getPitch());
+                    world.spawn(upgLoc, Villager.class, villager -> {
+                        villager.setAI(false);
+                        villager.setCollidable(false);
+                        villager.setInvulnerable(true);
+                        villager.setSilent(true);
+                        villager.setCustomNameVisible(true);
+                        villager.setCustomName(teamDef.getColor().getChatColor() + "Upgrades");
+                    });
+                    final double ux = upgLoc.getX();
+                    final double uy = upgLoc.getY();
+                    final double uz = upgLoc.getZ();
+                    world.spawn(new Location(world, ux, uy + 2.0, uz), ArmorStand.class, stand -> {
+                        stand.setMarker(true);
+                        stand.setInvisible(true);
+                        stand.setGravity(false);
+                        stand.setCustomNameVisible(true);
+                        stand.setCustomName(ChatColor.GREEN + "UPGRADES");
+                    });
+                    world.spawn(new Location(world, ux, uy + 1.75, uz), ArmorStand.class, stand -> {
+                        stand.setMarker(true);
+                        stand.setInvisible(true);
+                        stand.setGravity(false);
+                        stand.setCustomNameVisible(true);
+                        stand.setCustomName(ChatColor.GOLD + "RIGHT CLICK");
                     });
                 }
             }

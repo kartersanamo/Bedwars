@@ -20,16 +20,17 @@ public final class SidebarUpdateTask extends BukkitRunnable {
     @Override
     public void run() {
         for (IArena arena : plugin.getArenaManager().getArenas()) {
-            sidebarService.updateForArena(arena);
             if (arena.getGameState() == com.kartersanamo.bedwars.api.arena.EGameState.IN_GAME
                     || arena.getGameState() == com.kartersanamo.bedwars.api.arena.EGameState.ENDING) {
                 if (arena instanceof com.kartersanamo.bedwars.arena.Arena a) {
+                    a.checkTierUpgrades();
                     for (org.bukkit.entity.Player player : arena.getPlayers()) {
                         a.ensureSword(player);
                         a.reapplyArmorIfNeeded(player);
                     }
                 }
             }
+            sidebarService.updateForArena(arena);
         }
     }
 }

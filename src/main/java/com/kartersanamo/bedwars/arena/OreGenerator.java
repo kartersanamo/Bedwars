@@ -10,9 +10,13 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Basic implementation of a resource generator.
+ * Tracks how many of its dropped items are still on the ground; does not spawn when at cap.
  * Iron and gold generators may have a forward target (team spawn) for block-placement protection.
  */
 public final class OreGenerator implements IGenerator {
@@ -26,6 +30,11 @@ public final class OreGenerator implements IGenerator {
     private final int intervalTicks;
     private final int maxItems;
 
+    private final GeneratorItemTracker itemTracker;
+
+    /** UUIDs of item entities we have dropped that are still on the ground (not yet picked up or removed). */
+    private final Set<UUID> droppedItemIds = ConcurrentHashMap.newKeySet();
+
     private long lastDropTick;
 
     public OreGenerator(final IArena arena,
@@ -33,7 +42,7 @@ public final class OreGenerator implements IGenerator {
                         final Location location,
                         final int intervalTicks,
                         final int maxItems) {
-        this(arena, type, location, intervalTicks, maxItems, null);
+        this(arena, type, location, intervalTicks, maxItems, null, null);
     }
 
     public OreGenerator(final IArena arena,
@@ -42,12 +51,23 @@ public final class OreGenerator implements IGenerator {
                         final int intervalTicks,
                         final int maxItems,
                         final Location forwardTarget) {
+        this(arena, type, location, intervalTicks, maxItems, forwardTarget, null);
+    }
+
+    public OreGenerator(final IArena arena,
+                        final EGeneratorType type,
+                        final Location location,
+                        final int intervalTicks,
+                        final int maxItems,
+                        final Location forwardTarget,
+                        final GeneratorItemTracker itemTracker) {
         this.arena = Objects.requireNonNull(arena, "arena");
         this.type = Objects.requireNonNull(type, "type");
         this.location = Objects.requireNonNull(location, "location").clone();
         this.intervalTicks = intervalTicks;
         this.maxItems = maxItems;
         this.forwardTarget = forwardTarget != null ? forwardTarget.clone() : null;
+        this.itemTracker = itemTracker;
     }
 
     /**
@@ -89,6 +109,27 @@ public final class OreGenerator implements IGenerator {
         return lastDropTick;
     }
 
+    /**
+     * Number of this generator's dropped items still on the ground (tracked globally, not just nearby).
+     */
+    public int getCurrentDroppedCount() {
+        return droppedItemIds.size();
+    }
+
+    /**
+     * Called by {@link GeneratorItemTracker} when this generator drops an item.
+     */
+    public void registerDroppedItem(final UUID itemEntityId) {
+        droppedItemIds.add(itemEntityId);
+    }
+
+    /**
+     * Called when an item we dropped is picked up, merged, or despawned.
+     */
+    public void onDroppedItemRemoved(final UUID itemEntityId) {
+        droppedItemIds.remove(itemEntityId);
+    }
+
     @Override
     public void tick(final long currentTick) {
         final int effectiveInterval = getEffectiveIntervalTicks();
@@ -105,17 +146,27 @@ public final class OreGenerator implements IGenerator {
             return;
         }
 
-        final long nearbyCount = world.getNearbyEntities(location, 1.5, 1.5, 1.5).stream()
-                .filter(entity -> entity instanceof Item item && item.getItemStack().getType() == type.getDropMaterial())
-                .count();
-
-        if (nearbyCount >= maxItems) {
-            lastDropTick = currentTick;
-            return;
+        if (itemTracker != null) {
+            if (getCurrentDroppedCount() >= maxItems) {
+                lastDropTick = currentTick;
+                return;
+            }
+        } else {
+            final long nearbyCount = world.getNearbyEntities(location, 1.5, 1.5, 1.5).stream()
+                    .filter(entity -> entity instanceof Item it && it.getItemStack().getType() == type.getDropMaterial())
+                    .count();
+            if (nearbyCount >= maxItems) {
+                lastDropTick = currentTick;
+                return;
+            }
         }
 
         final Item item = world.dropItem(location, new ItemStack(type.getDropMaterial(), 1));
         item.setVelocity(new org.bukkit.util.Vector(0.0, 0.0, 0.0));
         lastDropTick = currentTick;
+
+        if (itemTracker != null) {
+            itemTracker.track(this, item);
+        }
     }
 }

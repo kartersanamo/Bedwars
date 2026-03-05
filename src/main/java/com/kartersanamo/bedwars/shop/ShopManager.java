@@ -151,8 +151,9 @@ public final class ShopManager {
         final List<IContentTier> contentTiers = "quick_buy".equals(viewId)
                 ? defaultQuickBuyTiers
                 : getContentTiersList(category);
-        final ShopInventoryHolder holder = new ShopInventoryHolderImpl(viewId, category, contentTiers);
+        final ShopInventoryHolderImpl holder = new ShopInventoryHolderImpl(viewId, category, contentTiers);
         final Inventory inv = Bukkit.createInventory(holder, 54, title);
+        holder.setInventory(inv);
 
         for (int i = 0; i < NAV_ORDER.length; i++) {
             inv.setItem(i, navItemForSlot(i));

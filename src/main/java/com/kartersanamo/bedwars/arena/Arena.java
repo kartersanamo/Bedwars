@@ -73,6 +73,10 @@ public final class Arena implements IArena {
 
     /** Kill count this game per player (for end-of-game summary). */
     private final Map<UUID, Integer> killCountThisGame = new HashMap<>();
+    /** Final kills this game per player (for tab list). */
+    private final Map<UUID, Integer> finalKillsThisGame = new HashMap<>();
+    /** Beds broken this game per player (for tab list). */
+    private final Map<UUID, Integer> bedsBrokenThisGame = new HashMap<>();
 
     /** Per-team diamond upgrade and trap state. */
     private final Map<String, TeamUpgradeState> teamUpgradeStates = new HashMap<>();
@@ -463,15 +467,13 @@ public final class Arena implements IArena {
     private static void sendGameStartIntro(final Player player) {
         final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
         player.sendMessage(separator);
-        player.sendTitle(
-                ChatColor.WHITE + "Bed Wars",
-                ChatColor.YELLOW + "Protect your bed and destroy the enemy beds.",
-                10, 70, 20
-        );
-        player.sendMessage(ChatColor.YELLOW + "Protect your bed and destroy the enemy beds.");
-        player.sendMessage(ChatColor.YELLOW + "Upgrade yourself and your team by collecting");
-        player.sendMessage(ChatColor.YELLOW + "Iron, Gold, Emerald and Diamond from generators");
-        player.sendMessage(ChatColor.YELLOW + "to access powerful upgrades.");
+        player.sendMessage(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Protect your bed and destroy the enemy beds.");
+        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Upgrade yourself and your team by collecting");
+        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Iron, Gold, Emerald and Diamond from generators");
+        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "to access powerful upgrades.");
+        player.sendMessage("");
         player.sendMessage(separator);
     }
 
@@ -493,6 +495,7 @@ public final class Arena implements IArena {
             spectators.add(player.getUniqueId());
             if (eliminatedTeamOpt.isPresent()) {
                 final ITeam eliminatedTeam = eliminatedTeamOpt.get();
+                eliminatedTeam.removePlayer(player);
                 boolean anyLeft = false;
                 for (UUID memberId : eliminatedTeam.getMemberIds()) {
                     if (players.contains(memberId)) {
@@ -504,30 +507,35 @@ public final class Arena implements IArena {
                     final String colorName = eliminatedTeam.getColor().name().charAt(0) + eliminatedTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
                     final String msg = ChatColor.WHITE.toString() + ChatColor.BOLD + "TEAM ELIMINATED > "
                             + eliminatedTeam.getColor().getChatColor() + colorName + " Team"
-                            + ChatColor.WHITE + " has been eliminated!";
+                            + ChatColor.GRAY + " has been eliminated!";
                     for (Player p : getPlayers()) {
+                        p.sendMessage("");
                         p.sendMessage(msg);
+                        p.sendMessage("");
                     }
                     for (Player p : getSpectators()) {
+                        p.sendMessage("");
                         p.sendMessage(msg);
+                        p.sendMessage("");
                     }
                 }
             }
+            checkGameOver();
             return;
         }
 
         // Respawn flow: title/subtitle + chat countdown, then respawn at base after RESPAWN_SPECTATOR_SECONDS.
         player.sendTitle(
                 ChatColor.RED + "YOU DIED!",
-                ChatColor.YELLOW + "You will respawn in " + RESPAWN_SPECTATOR_SECONDS + " seconds!",
+                ChatColor.YELLOW + "You will respawn in " + ChatColor.RED +  RESPAWN_SPECTATOR_SECONDS + ChatColor.YELLOW + " seconds!",
                 10, 70, 20
         );
         player.sendMessage(ChatColor.YELLOW + "You will respawn in " + RESPAWN_SPECTATOR_SECONDS + " seconds!");
         for (int s = RESPAWN_SPECTATOR_SECONDS - 1; s >= 1; s--) {
             final int secondsLeft = s;
             final String msg = s == 1
-                    ? ChatColor.YELLOW + "You will respawn in 1 second!"
-                    : ChatColor.YELLOW + "You will respawn in " + secondsLeft + " seconds!";
+                    ? ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + "1" + ChatColor.YELLOW + " second!"
+                    : ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + secondsLeft + ChatColor.YELLOW + " seconds!";
             Bukkit.getScheduler().runTaskLater(plugin, () -> player.sendMessage(msg), (RESPAWN_SPECTATOR_SECONDS - secondsLeft) * 20L);
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -571,6 +579,7 @@ public final class Arena implements IArena {
     @Override
     public void handleBedDestroyed(final ITeam victimTeam, final Player breaker) {
         victimTeam.setBedDestroyed(true);
+        recordBedBroken(breaker.getUniqueId());
         if (plugin instanceof Bedwars bw) {
             try {
                 bw.getDatabase().getCachedStats(breaker.getUniqueId(), breaker.getName()).incrementBedsBroken();
@@ -578,19 +587,31 @@ public final class Arena implements IArena {
             }
         }
         final String colorName = victimTeam.getColor().name().charAt(0) + victimTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
+
         final String message = ChatColor.WHITE.toString() + ChatColor.BOLD + "BED DESTRUCTION > "
                 + victimTeam.getColor().getChatColor() + colorName + " Bed"
-                + ChatColor.WHITE + " was destroyed by " + breaker.getName() + "!";
+                + ChatColor.GRAY + " was destroyed by "
+                + breaker.getName() + "!";
         for (Player p : getPlayers()) {
+            p.sendMessage("");
             p.sendMessage(message);
+            p.sendMessage("");
         }
         for (Player p : getSpectators()) {
+            p.sendMessage("");
             p.sendMessage(message);
+            p.sendMessage("");
         }
     }
 
     @Override
     public void resetAfterGame() {
+        for (Player p : getPlayers()) {
+            p.getEnderChest().clear();
+        }
+        for (Player p : getSpectators()) {
+            p.getEnderChest().clear();
+        }
         players.clear();
         spectators.clear();
         spawnProtectionUntil.clear();
@@ -607,10 +628,39 @@ public final class Arena implements IArena {
         }
         playersInsideEnemyBase.clear();
         killCountThisGame.clear();
+        finalKillsThisGame.clear();
+        bedsBrokenThisGame.clear();
         diamondTier = 1;
         emeraldTier = 1;
         generatorPhase = GeneratorPhase.NORMAL;
         gameState = EGameState.LOBBY_WAITING;
+    }
+
+    /**
+     * Checks win condition: if at most one team is left (not eliminated), ends the game.
+     * Call after a player is eliminated (final kill) and from GamePlayingTask.
+     */
+    public void checkGameOver() {
+        if (gameState != EGameState.IN_GAME) {
+            return;
+        }
+        final List<ITeam> aliveTeams = teams.stream()
+                .filter(team -> !team.isEliminated())
+                .toList();
+        if (aliveTeams.size() > 1) {
+            return;
+        }
+        gameState = EGameState.ENDING;
+        final ITeam winningTeam = aliveTeams.isEmpty() ? null : aliveTeams.getFirst();
+        broadcastGameOverSummary(winningTeam);
+        if (playingTask != null) {
+            playingTask.cancel();
+            playingTask = null;
+        }
+        final Bedwars bedwars = plugin instanceof Bedwars ? (Bedwars) plugin : Bedwars.getInstance();
+        if (bedwars != null) {
+            new GameRestartingTask(bedwars, this, 10).runTaskTimer(plugin, 20L, 20L);
+        }
     }
 
     /** Called every second (or tick) to apply tier upgrades when time is reached. */
@@ -725,6 +775,33 @@ public final class Arena implements IArena {
     public void recordKill(final UUID killerUniqueId) {
         if (killerUniqueId == null) return;
         killCountThisGame.merge(killerUniqueId, 1, Integer::sum);
+    }
+
+    @Override
+    public void recordFinalKill(final UUID killerUniqueId) {
+        if (killerUniqueId == null) return;
+        finalKillsThisGame.merge(killerUniqueId, 1, Integer::sum);
+    }
+
+    /** Records a bed broken by the given player (this game only). */
+    public void recordBedBroken(final UUID playerUniqueId) {
+        if (playerUniqueId == null) return;
+        bedsBrokenThisGame.merge(playerUniqueId, 1, Integer::sum);
+    }
+
+    @Override
+    public int getKillsThisGame(final UUID playerUniqueId) {
+        return killCountThisGame.getOrDefault(playerUniqueId, 0);
+    }
+
+    @Override
+    public int getFinalKillsThisGame(final UUID playerUniqueId) {
+        return finalKillsThisGame.getOrDefault(playerUniqueId, 0);
+    }
+
+    @Override
+    public int getBedsBrokenThisGame(final UUID playerUniqueId) {
+        return bedsBrokenThisGame.getOrDefault(playerUniqueId, 0);
     }
 
     @Override
@@ -908,6 +985,7 @@ public final class Arena implements IArena {
     }
 
     private void applyArmor(final Player player) {
+        removeKitArmorFromInventory(player);
         final Optional<ITeam> teamOpt = getTeam(player);
         final ETeamColor color = teamOpt.map(ITeam::getColor).orElse(ETeamColor.WHITE);
         final ArmorTier tier = getPlayerArmorTier(player);
@@ -954,6 +1032,23 @@ public final class Arena implements IArena {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    /** Removes any unbreakable armor from the player's storage/hotbar to prevent duplication when reapplying. */
+    private static void removeKitArmorFromInventory(final Player player) {
+        final org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        for (int i = 0; i < 36; i++) {
+            final ItemStack stack = inv.getItem(i);
+            if (stack != null && stack.getItemMeta() != null && stack.getItemMeta().isUnbreakable() && isArmorType(stack.getType())) {
+                inv.setItem(i, null);
+            }
+        }
+    }
+
+    private static boolean isArmorType(final Material type) {
+        if (type == null) return false;
+        final String n = type.name();
+        return n.endsWith("_HELMET") || n.endsWith("_CHESTPLATE") || n.endsWith("_LEGGINGS") || n.endsWith("_BOOTS");
     }
 
     /** Ensures player has at least one sword; if none, adds wooden. Call from enforcement task/listener. */

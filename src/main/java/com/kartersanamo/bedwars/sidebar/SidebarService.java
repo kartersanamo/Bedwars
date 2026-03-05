@@ -7,12 +7,12 @@ import com.kartersanamo.bedwars.api.arena.team.ETeamColor;
 import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import com.kartersanamo.bedwars.api.sidebar.ISidebar;
 import com.kartersanamo.bedwars.api.sidebar.ISidebarManager;
-import com.kartersanamo.bedwars.database.PlayerStats;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Sidebar manager: waiting-lobby scoreboard (map, players, status, mode, version)
@@ -64,28 +64,31 @@ public final class SidebarService implements ISidebarManager {
             final ISidebar sidebar = createSidebar(player);
             sidebar.setTitle(title);
             sidebar.setLines(lines);
-            updateTabList(player);
+            updateTabList(player, arena);
         }
     }
 
     /**
      * Sets the tab list header and footer for a player in an arena.
      * Header: "You are playing on PLAY.KARTERSANAMO.COM"
-     * Footer: "Kills: X Final Kills: Y Beds Broken: Z" and "Ranks, Boosters & MORE! STORE.KARTERSANAMO.COM"
+     * Footer: "Kills: X Final Kills: Y Beds Broken: Z" (this game when in game/ending, else 0) and "Ranks, Boosters & MORE! STORE.KARTERSANAMO.COM"
      */
-    private void updateTabList(final Player player) {
+    private void updateTabList(final Player player, final IArena arena) {
         final String header = ChatColor.AQUA + "You are playing on " + ChatColor.YELLOW + ChatColor.BOLD + "PLAY.KARTERSANAMO.COM";
-        int kills = 0, finalKills = 0, bedsBroken = 0;
-        try {
-            final PlayerStats stats = plugin.getDatabase().getCachedStats(player.getUniqueId(), player.getName());
-            kills = stats.getKills();
-            finalKills = stats.getFinalKills();
-            bedsBroken = stats.getBedsBroken();
-        } catch (Exception ignored) {
+        int kills, finalKills, bedsBroken;
+        final EGameState state = arena.getGameState();
+        if (state == EGameState.IN_GAME || state == EGameState.ENDING) {
+            kills = arena.getKillsThisGame(player.getUniqueId());
+            finalKills = arena.getFinalKillsThisGame(player.getUniqueId());
+            bedsBroken = arena.getBedsBrokenThisGame(player.getUniqueId());
+        } else {
+            kills = 0;
+            finalKills = 0;
+            bedsBroken = 0;
         }
-        final String footer = ChatColor.GRAY + "Kills: " + ChatColor.WHITE + kills
-                + ChatColor.GRAY + " Final Kills: " + ChatColor.WHITE + finalKills
-                + ChatColor.GRAY + " Beds Broken: " + ChatColor.WHITE + bedsBroken
+        final String footer = ChatColor.AQUA + "Kills: " + ChatColor.YELLOW + kills
+                + ChatColor.AQUA + " Final Kills: " + ChatColor.YELLOW + finalKills
+                + ChatColor.AQUA + " Beds Broken: " + ChatColor.YELLOW + bedsBroken
                 + "\n"
                 + ChatColor.GREEN + "Ranks, Boosters & MORE! " + ChatColor.RED + ChatColor.BOLD + "STORE.KARTERSANAMO.COM";
         player.setPlayerListHeaderFooter(header, footer);
@@ -95,23 +98,31 @@ public final class SidebarService implements ISidebarManager {
         final List<String> lines = new ArrayList<>();
         final String date = new SimpleDateFormat("MM/dd/yy").format(new Date());
         final String shortId = arena.getId().length() >= 4 ? arena.getId().substring(0, 4).toUpperCase(Locale.ROOT) : arena.getId().toUpperCase(Locale.ROOT);
-        lines.add(ChatColor.GRAY + date + " " + shortId);
+        lines.add(ChatColor.GRAY + date + " " + ChatColor.DARK_GRAY + shortId);
+
+        lines.add(ChatColor.GRAY + " ");
 
         lines.add(ChatColor.WHITE + "Map: " + ChatColor.GREEN + arena.getDisplayName());
         final int current = arena.getPlayers().size();
         final int max = arena.getMaxPlayers();
-        lines.add(ChatColor.GRAY + "Players: " + current + "/" + max);
+        lines.add(ChatColor.WHITE + "Players: " + ChatColor.GREEN + current + "/" + max);
+
+        lines.add(ChatColor.GRAY + " ");
 
         final String status = arena.getGameState() == EGameState.STARTING
                 ? ChatColor.GRAY + "Starting..."
                 : ChatColor.GRAY + "Waiting...";
         lines.add(status);
 
+        lines.add(ChatColor.GRAY + " ");
+
         final String modeStr = modeName(arena.getTeamSize());
         lines.add(ChatColor.WHITE + "Mode: " + ChatColor.GREEN + modeStr);
 
         final String version = "v" + plugin.getDescription().getVersion();
-        lines.add(ChatColor.GRAY + "Version: " + version);
+        lines.add(ChatColor.WHITE + "Version: " + ChatColor.GRAY + version);
+
+        lines.add(ChatColor.GRAY + " ");
 
         lines.add(ChatColor.GRAY + " ");
         lines.add(ChatColor.RED + "play.kartersanamo.com");
@@ -131,7 +142,8 @@ public final class SidebarService implements ISidebarManager {
     private List<String> buildGameLines(final IArena arena) {
         final List<String> lines = new ArrayList<>();
         final String date = new SimpleDateFormat("MM/dd/yy").format(new Date());
-        lines.add(ChatColor.GRAY + date);
+        final String shortId = arena.getId().length() >= 4 ? arena.getId().substring(0, 4).toUpperCase(Locale.ROOT) : arena.getId().toUpperCase(Locale.ROOT);
+        lines.add(ChatColor.GRAY + date + "" + ChatColor.DARK_GRAY + shortId);
         lines.add(arena.getNextTierUpgradeMessage());
         lines.add(ChatColor.GRAY + " ");
         final List<ITeam> arenaTeams = arena.getTeams();
@@ -149,8 +161,11 @@ public final class SidebarService implements ISidebarManager {
                 if (!team.isBedDestroyed()) {
                     status = ChatColor.GREEN + "✔";
                 } else {
+                    final Set<UUID> activePlayerIds = arena.getPlayers().stream()
+                            .map(Player::getUniqueId)
+                            .collect(Collectors.toSet());
                     final long alive = team.getOnlineMembers().stream()
-                            .filter(p -> arena.contains(p) && !p.isDead())
+                            .filter(p -> activePlayerIds.contains(p.getUniqueId()))
                             .count();
                     status = alive > 0 ? ChatColor.YELLOW.toString() + alive : ChatColor.RED + "✖";
                 }
@@ -160,7 +175,7 @@ public final class SidebarService implements ISidebarManager {
             lines.add(line);
         }
         lines.add(ChatColor.GRAY + "  ");
-        lines.add(ChatColor.GOLD + "play.kartersanamo.com");
+        lines.add(ChatColor.YELLOW + "play.kartersanamo.com");
         return lines;
     }
 

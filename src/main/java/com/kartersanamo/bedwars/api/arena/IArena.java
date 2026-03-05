@@ -82,6 +82,26 @@ public interface IArena {
     void recordKill(UUID killerUniqueId);
 
     /**
+     * Records a final kill for the given killer (this game only). Call when a player gets a final kill.
+     */
+    void recordFinalKill(UUID killerUniqueId);
+
+    /**
+     * Returns this game's kill count for the player (0 if not in game or no kills).
+     */
+    int getKillsThisGame(UUID playerUniqueId);
+
+    /**
+     * Returns this game's final kill count for the player (0 if not in game or none).
+     */
+    int getFinalKillsThisGame(UUID playerUniqueId);
+
+    /**
+     * Returns this game's beds broken count for the player (0 if not in game or none).
+     */
+    int getBedsBrokenThisGame(UUID playerUniqueId);
+
+    /**
      * Returns whether the player currently has spawn protection (invulnerability after respawn).
      */
     boolean hasSpawnProtection(Player player);

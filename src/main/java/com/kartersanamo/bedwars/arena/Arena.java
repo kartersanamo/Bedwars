@@ -12,15 +12,24 @@ import com.kartersanamo.bedwars.arena.tasks.GamePlayingTask;
 import com.kartersanamo.bedwars.arena.tasks.GameRestartingTask;
 import com.kartersanamo.bedwars.arena.tasks.GameStartingTask;
 import com.kartersanamo.bedwars.sidebar.SidebarService;
+import com.kartersanamo.bedwars.upgrades.TeamUpgradeState;
+import com.kartersanamo.bedwars.upgrades.TrapType;
+import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.configuration.ArenaConfig;
+import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.Sound;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -62,6 +71,18 @@ public final class Arena implements IArena {
     private final Map<UUID, ToolTier> playerPickaxeTier = new HashMap<>();
     private final Set<UUID> playerHasShears = new HashSet<>();
 
+    /** Kill count this game per player (for end-of-game summary). */
+    private final Map<UUID, Integer> killCountThisGame = new HashMap<>();
+
+    /** Per-team diamond upgrade and trap state. */
+    private final Map<String, TeamUpgradeState> teamUpgradeStates = new HashMap<>();
+
+    /** Players currently inside an enemy base (teamId -> set of player UUIDs) for trap trigger cooldown. */
+    private final Map<String, Set<UUID>> playersInsideEnemyBase = new HashMap<>();
+
+    private static final int BASE_TRAP_RADIUS = 10;
+    private static final int HEAL_POOL_RADIUS = 12;
+
     private final JavaPlugin plugin;
 
     private boolean enabled = true;
@@ -69,6 +90,12 @@ public final class Arena implements IArena {
 
     private GameStartingTask startingTask;
     private GamePlayingTask playingTask;
+
+    /** When the game started (IN_GAME); used for tier upgrade timers. */
+    private long gameStartMillis;
+    private int diamondTier = 1;
+    private int emeraldTier = 1;
+    private GeneratorPhase generatorPhase = GeneratorPhase.NORMAL;
 
     private Arena(final String id,
                   final String displayName,
@@ -94,6 +121,9 @@ public final class Arena implements IArena {
         this.lobbyRegion = lobbyRegion;
         this.teams = Collections.unmodifiableList(new ArrayList<>(teams));
         this.plugin = plugin;
+        for (ITeam t : teams) {
+            this.teamUpgradeStates.put(t.getId(), new TeamUpgradeState());
+        }
     }
 
     public static Arena fromConfig(final ArenaConfig config,
@@ -253,6 +283,10 @@ public final class Arena implements IArena {
         return teams;
     }
 
+    public TeamUpgradeState getTeamUpgradeState(final ITeam team) {
+        return team == null ? null : teamUpgradeStates.get(team.getId());
+    }
+
     @Override
     public Optional<ITeam> getTeam(final Player player) {
         return teams.stream()
@@ -397,6 +431,10 @@ public final class Arena implements IArena {
             return;
         }
         gameState = EGameState.IN_GAME;
+        gameStartMillis = System.currentTimeMillis();
+        diamondTier = 1;
+        emeraldTier = 1;
+        generatorPhase = GeneratorPhase.NORMAL;
 
         // Assign all players to teams randomly, then teleport (addPlayer teleports to team spawn).
         assignAllPlayersToTeamsRandomly();
@@ -410,6 +448,7 @@ public final class Arena implements IArena {
 
         for (Player p : getPlayers()) {
             giveStarterKit(p);
+            sendGameStartIntro(p);
         }
 
         clearLobbyRegion();
@@ -421,27 +460,82 @@ public final class Arena implements IArena {
         playingTask.runTaskTimer(plugin, 20L, 20L);
     }
 
+    private static void sendGameStartIntro(final Player player) {
+        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+        player.sendMessage(separator);
+        player.sendTitle(
+                ChatColor.WHITE + "Bed Wars",
+                ChatColor.YELLOW + "Protect your bed and destroy the enemy beds.",
+                10, 70, 20
+        );
+        player.sendMessage(ChatColor.YELLOW + "Protect your bed and destroy the enemy beds.");
+        player.sendMessage(ChatColor.YELLOW + "Upgrade yourself and your team by collecting");
+        player.sendMessage(ChatColor.YELLOW + "Iron, Gold, Emerald and Diamond from generators");
+        player.sendMessage(ChatColor.YELLOW + "to access powerful upgrades.");
+        player.sendMessage(separator);
+    }
+
     private static final int RESPAWN_SPECTATOR_SECONDS = 3;
     private static final int SPAWN_PROTECTION_SECONDS = 2;
 
     @Override
     public void handlePlayerDeath(final Player player, final Player killer) {
+        player.teleport(spectatorSpawn);
+        player.setGameMode(GameMode.SPECTATOR);
+
         final Optional<ITeam> teamOpt = getTeam(player);
         final boolean bedDestroyed = teamOpt.map(ITeam::isBedDestroyed).orElse(true);
 
         if (bedDestroyed) {
-            // Eliminated: move to spectators permanently.
+            player.sendMessage(ChatColor.RED + "You have been eliminated!");
+            final Optional<ITeam> eliminatedTeamOpt = teamOpt;
             players.remove(player.getUniqueId());
             spectators.add(player.getUniqueId());
-            player.teleport(spectatorSpawn);
-            player.setGameMode(GameMode.SPECTATOR);
+            if (eliminatedTeamOpt.isPresent()) {
+                final ITeam eliminatedTeam = eliminatedTeamOpt.get();
+                boolean anyLeft = false;
+                for (UUID memberId : eliminatedTeam.getMemberIds()) {
+                    if (players.contains(memberId)) {
+                        anyLeft = true;
+                        break;
+                    }
+                }
+                if (!anyLeft) {
+                    final String colorName = eliminatedTeam.getColor().name().charAt(0) + eliminatedTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
+                    final String msg = ChatColor.WHITE.toString() + ChatColor.BOLD + "TEAM ELIMINATED > "
+                            + eliminatedTeam.getColor().getChatColor() + colorName + " Team"
+                            + ChatColor.WHITE + " has been eliminated!";
+                    for (Player p : getPlayers()) {
+                        p.sendMessage(msg);
+                    }
+                    for (Player p : getSpectators()) {
+                        p.sendMessage(msg);
+                    }
+                }
+            }
             return;
         }
 
-        // Respawn flow: spectator for 3 seconds, then respawn at base with 2 seconds spawn protection.
-        player.setGameMode(GameMode.SPECTATOR);
-        // Keep in players; do not add to spectators.
-        Bukkit.getScheduler().runTaskLater(plugin, () -> respawnAtBase(player), RESPAWN_SPECTATOR_SECONDS * 20L);
+        // Respawn flow: title/subtitle + chat countdown, then respawn at base after RESPAWN_SPECTATOR_SECONDS.
+        player.sendTitle(
+                ChatColor.RED + "YOU DIED!",
+                ChatColor.YELLOW + "You will respawn in " + RESPAWN_SPECTATOR_SECONDS + " seconds!",
+                10, 70, 20
+        );
+        player.sendMessage(ChatColor.YELLOW + "You will respawn in " + RESPAWN_SPECTATOR_SECONDS + " seconds!");
+        for (int s = RESPAWN_SPECTATOR_SECONDS - 1; s >= 1; s--) {
+            final int secondsLeft = s;
+            final String msg = s == 1
+                    ? ChatColor.YELLOW + "You will respawn in 1 second!"
+                    : ChatColor.YELLOW + "You will respawn in " + secondsLeft + " seconds!";
+            Bukkit.getScheduler().runTaskLater(plugin, () -> player.sendMessage(msg), (RESPAWN_SPECTATOR_SECONDS - secondsLeft) * 20L);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            respawnAtBase(player);
+            if (players.contains(player.getUniqueId())) {
+                player.sendMessage(ChatColor.YELLOW + "You have respawned!");
+            }
+        }, RESPAWN_SPECTATOR_SECONDS * 20L);
     }
 
     /**
@@ -477,6 +571,22 @@ public final class Arena implements IArena {
     @Override
     public void handleBedDestroyed(final ITeam victimTeam, final Player breaker) {
         victimTeam.setBedDestroyed(true);
+        if (plugin instanceof Bedwars bw) {
+            try {
+                bw.getDatabase().getCachedStats(breaker.getUniqueId(), breaker.getName()).incrementBedsBroken();
+            } catch (Exception ignored) {
+            }
+        }
+        final String colorName = victimTeam.getColor().name().charAt(0) + victimTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
+        final String message = ChatColor.WHITE.toString() + ChatColor.BOLD + "BED DESTRUCTION > "
+                + victimTeam.getColor().getChatColor() + colorName + " Bed"
+                + ChatColor.WHITE + " was destroyed by " + breaker.getName() + "!";
+        for (Player p : getPlayers()) {
+            p.sendMessage(message);
+        }
+        for (Player p : getSpectators()) {
+            p.sendMessage(message);
+        }
     }
 
     @Override
@@ -490,8 +600,173 @@ public final class Arena implements IArena {
         playerHasShears.clear();
         for (ITeam team : teams) {
             team.resetTeam();
+            final TeamUpgradeState state = teamUpgradeStates.get(team.getId());
+            if (state != null) {
+                state.reset();
+            }
         }
+        playersInsideEnemyBase.clear();
+        killCountThisGame.clear();
+        diamondTier = 1;
+        emeraldTier = 1;
+        generatorPhase = GeneratorPhase.NORMAL;
         gameState = EGameState.LOBBY_WAITING;
+    }
+
+    /** Called every second (or tick) to apply tier upgrades when time is reached. */
+    public void checkTierUpgrades() {
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) {
+            return;
+        }
+        final GeneratorsConfig config = plugin instanceof Bedwars ? ((Bedwars) plugin).getGeneratorsConfig() : null;
+        if (config == null) {
+            return;
+        }
+        final long elapsedSeconds = (System.currentTimeMillis() - gameStartMillis) / 1000L;
+
+        if (diamondTier < 2 && elapsedSeconds >= config.getTierUpgradeDiamond2Seconds()) {
+            diamondTier = 2;
+        }
+        if (emeraldTier < 2 && elapsedSeconds >= config.getTierUpgradeEmerald2Seconds()) {
+            emeraldTier = 2;
+        }
+        if (diamondTier < 3 && elapsedSeconds >= config.getTierUpgradeDiamond3Seconds()) {
+            diamondTier = 3;
+        }
+        if (emeraldTier < 3 && elapsedSeconds >= config.getTierUpgradeEmerald3Seconds()) {
+            emeraldTier = 3;
+        }
+        if (generatorPhase == GeneratorPhase.NORMAL && elapsedSeconds >= config.getTierUpgradeBedBreakSeconds()) {
+            generatorPhase = GeneratorPhase.BED_BREAK;
+        }
+        if (generatorPhase != GeneratorPhase.SUDDEN_DEATH && elapsedSeconds >= config.getTierUpgradeSuddenDeathSeconds()) {
+            generatorPhase = GeneratorPhase.SUDDEN_DEATH;
+        }
+    }
+
+    @Override
+    public int getDiamondTier() {
+        return diamondTier;
+    }
+
+    @Override
+    public int getEmeraldTier() {
+        return emeraldTier;
+    }
+
+    @Override
+    public int getEffectiveDiamondIntervalTicks() {
+        final GeneratorsConfig config = plugin instanceof Bedwars ? ((Bedwars) plugin).getGeneratorsConfig() : null;
+        if (config == null) return 600;
+        return switch (diamondTier) {
+            case 2 -> config.getDiamondTier2IntervalTicks();
+            case 3 -> config.getDiamondTier3IntervalTicks();
+            default -> config.getDiamondIntervalTicks();
+        };
+    }
+
+    @Override
+    public int getEffectiveEmeraldIntervalTicks() {
+        final GeneratorsConfig config = plugin instanceof Bedwars ? ((Bedwars) plugin).getGeneratorsConfig() : null;
+        if (config == null) return 1200;
+        return switch (emeraldTier) {
+            case 2 -> config.getEmeraldTier2IntervalTicks();
+            case 3 -> config.getEmeraldTier3IntervalTicks();
+            default -> config.getEmeraldIntervalTicks();
+        };
+    }
+
+    @Override
+    public String getNextTierUpgradeMessage() {
+        final GeneratorsConfig config = plugin instanceof Bedwars ? ((Bedwars) plugin).getGeneratorsConfig() : null;
+        if (config == null) return ChatColor.GRAY + "—";
+        final long elapsedSeconds = (System.currentTimeMillis() - gameStartMillis) / 1000L;
+
+        if (diamondTier < 2) {
+            final int at = config.getTierUpgradeDiamond2Seconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Diamond II in " + ChatColor.GREEN + formatTime(rem);
+        }
+        if (emeraldTier < 2) {
+            final int at = config.getTierUpgradeEmerald2Seconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Emerald II in " + ChatColor.GREEN + formatTime(rem);
+        }
+        if (diamondTier < 3) {
+            final int at = config.getTierUpgradeDiamond3Seconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Diamond III in " + ChatColor.GREEN + formatTime(rem);
+        }
+        if (emeraldTier < 3) {
+            final int at = config.getTierUpgradeEmerald3Seconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Emerald III in " + ChatColor.GREEN + formatTime(rem);
+        }
+        if (generatorPhase == GeneratorPhase.NORMAL) {
+            final int at = config.getTierUpgradeBedBreakSeconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Bed Break in " + ChatColor.GREEN + formatTime(rem);
+        }
+        if (generatorPhase == GeneratorPhase.BED_BREAK) {
+            final int at = config.getTierUpgradeSuddenDeathSeconds();
+            final long rem = Math.max(0, at - elapsedSeconds);
+            return ChatColor.WHITE + "Sudden Death in " + ChatColor.GREEN + formatTime(rem);
+        }
+        return ChatColor.GRAY + "Sudden Death";
+    }
+
+    private static String formatTime(final long totalSeconds) {
+        final long m = totalSeconds / 60;
+        final long s = totalSeconds % 60;
+        return m + ":" + (s < 10 ? "0" : "") + s;
+    }
+
+    @Override
+    public void recordKill(final UUID killerUniqueId) {
+        if (killerUniqueId == null) return;
+        killCountThisGame.merge(killerUniqueId, 1, Integer::sum);
+    }
+
+    @Override
+    public void broadcastGameOverSummary(final ITeam winningTeam) {
+        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+        for (Player p : getPlayers()) {
+            p.sendMessage(separator);
+            p.sendMessage(ChatColor.WHITE + "Bed Wars");
+            if (winningTeam != null) {
+                final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
+                final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
+                p.sendMessage(ChatColor.WHITE + colorName + " - " + names);
+            }
+            sendKillerStats(p);
+            p.sendMessage(separator);
+        }
+        for (Player p : getSpectators()) {
+            p.sendMessage(separator);
+            p.sendMessage(ChatColor.WHITE + "Bed Wars");
+            if (winningTeam != null) {
+                final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
+                final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
+                p.sendMessage(ChatColor.WHITE + colorName + " - " + names);
+            }
+            sendKillerStats(p);
+            p.sendMessage(separator);
+        }
+    }
+
+    private void sendKillerStats(final Player recipient) {
+        final List<Player> all = new ArrayList<>();
+        all.addAll(getPlayers());
+        all.addAll(getSpectators());
+        all.removeIf(p -> killCountThisGame.getOrDefault(p.getUniqueId(), 0) <= 0);
+        all.sort(Comparator.comparingInt(p -> -killCountThisGame.getOrDefault(p.getUniqueId(), 0)));
+        final ChatColor[] rankColors = { ChatColor.YELLOW, ChatColor.GOLD, ChatColor.RED };
+        for (int i = 0; i < Math.min(3, all.size()); i++) {
+            final Player p = all.get(i);
+            final int count = killCountThisGame.getOrDefault(p.getUniqueId(), 0);
+            final String rank = (i + 1) + (i == 0 ? "st" : i == 1 ? "nd" : "rd");
+            recipient.sendMessage(rankColors[i] + rank + " Killer - " + ChatColor.WHITE + p.getName() + " - " + count);
+        }
     }
 
     // --- Kit state for shop upgrades (armor/axe/pickaxe persist; sword resets on death) ---
@@ -636,14 +911,26 @@ public final class Arena implements IArena {
         final Optional<ITeam> teamOpt = getTeam(player);
         final ETeamColor color = teamOpt.map(ITeam::getColor).orElse(ETeamColor.WHITE);
         final ArmorTier tier = getPlayerArmorTier(player);
+        final TeamUpgradeState upgradeState = teamOpt.map(this::getTeamUpgradeState).orElse(null);
+        final int protLevel = upgradeState != null ? upgradeState.getProtection() : 0;
 
         final ItemStack chest = unbreakable(new ItemStack(Material.LEATHER_CHESTPLATE));
         final ItemStack helmet = unbreakable(new ItemStack(Material.LEATHER_HELMET));
         setLeatherColor(chest, color);
         setLeatherColor(helmet, color);
+        if (protLevel > 0) {
+            chest.addUnsafeEnchantment(Enchantment.PROTECTION, protLevel);
+            helmet.addUnsafeEnchantment(Enchantment.PROTECTION, protLevel);
+        }
 
         final ItemStack legs = unbreakable(new ItemStack(tier.getLeggings()));
         final ItemStack boots = unbreakable(new ItemStack(tier.getBoots()));
+        setLeatherColor(legs, color);
+        setLeatherColor(boots, color);
+        if (protLevel > 0) {
+            legs.addUnsafeEnchantment(Enchantment.PROTECTION, protLevel);
+            boots.addUnsafeEnchantment(Enchantment.PROTECTION, protLevel);
+        }
 
         player.getInventory().setChestplate(chest);
         player.getInventory().setHelmet(helmet);
@@ -676,7 +963,131 @@ public final class Arena implements IArena {
             if (s != null && isSword(s.getType())) count += s.getAmount();
         }
         if (count < 1) {
-            player.getInventory().addItem(unbreakable(new ItemStack(Material.WOODEN_SWORD)));
+            final ItemStack sword = unbreakable(new ItemStack(Material.WOODEN_SWORD));
+            applySharpnessIfTeamHas(player, sword);
+            player.getInventory().addItem(sword);
+        } else {
+            applySharpnessToAllSwords(player);
+        }
+    }
+
+    /** Applies Protection to current armor and Sharpness to all swords based on team upgrades. Call after shop buy or when reapplying. */
+    public void applyTeamUpgradesToInventory(final Player player) {
+        final Optional<ITeam> teamOpt = getTeam(player);
+        if (teamOpt.isEmpty()) return;
+        final TeamUpgradeState state = getTeamUpgradeState(teamOpt.get());
+        if (state == null) return;
+        final int prot = state.getProtection();
+        if (prot > 0) {
+            for (ItemStack piece : new ItemStack[]{
+                    player.getInventory().getHelmet(),
+                    player.getInventory().getChestplate(),
+                    player.getInventory().getLeggings(),
+                    player.getInventory().getBoots()
+            }) {
+                if (piece != null && !piece.getType().isAir() && piece.getType().getEquipmentSlot() != null) {
+                    piece.addUnsafeEnchantment(Enchantment.PROTECTION, prot);
+                }
+            }
+        }
+        applySharpnessToAllSwords(player);
+    }
+
+    private void applySharpnessToAllSwords(final Player player) {
+        final Optional<ITeam> teamOpt = getTeam(player);
+        if (teamOpt.isEmpty()) return;
+        if (!getTeamUpgradeState(teamOpt.get()).hasSharpness()) return;
+        for (ItemStack s : player.getInventory().getContents()) {
+            if (s != null && isSword(s.getType()) && !s.getEnchantments().containsKey(Enchantment.SHARPNESS)) {
+                s.addUnsafeEnchantment(Enchantment.SHARPNESS, 1);
+            }
+        }
+    }
+
+    private void applySharpnessIfTeamHas(final Player player, final ItemStack sword) {
+        final Optional<ITeam> teamOpt = getTeam(player);
+        if (teamOpt.isEmpty()) return;
+        if (getTeamUpgradeState(teamOpt.get()).hasSharpness()) {
+            sword.addUnsafeEnchantment(Enchantment.SHARPNESS, 1);
+        }
+    }
+
+    /**
+     * Call when a player moves. If they entered an enemy base and that team has a trap, trigger it.
+     */
+    public void checkTrapTrigger(final Player player) {
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) return;
+        final Optional<ITeam> playerTeamOpt = getTeam(player);
+        if (playerTeamOpt.isEmpty()) return;
+        final ITeam playerTeam = playerTeamOpt.get();
+        final Location loc = player.getLocation();
+        if (loc.getWorld() == null || !loc.getWorld().equals(world)) return;
+
+        for (ITeam team : teams) {
+            if (team.getId().equals(playerTeam.getId()) || team.isBedDestroyed()) continue;
+            final Location bed = team.getBedLocation();
+            if (bed == null || bed.getWorld() == null || !bed.getWorld().equals(world)) continue;
+            final boolean inBase = loc.distanceSquared(bed) <= (BASE_TRAP_RADIUS * BASE_TRAP_RADIUS);
+            final Set<UUID> inside = playersInsideEnemyBase.computeIfAbsent(team.getId(), k -> new HashSet<>());
+            if (inBase) {
+                if (!inside.contains(player.getUniqueId())) {
+                    inside.add(player.getUniqueId());
+                    triggerTrap(team, player);
+                }
+            } else {
+                inside.remove(player.getUniqueId());
+            }
+        }
+    }
+
+    private void triggerTrap(final ITeam defendingTeam, final Player enemy) {
+        final TeamUpgradeState state = getTeamUpgradeState(defendingTeam);
+        if (state == null) return;
+        final TrapType trap = state.consumeNextTrap();
+        if (trap == null) return;
+        switch (trap) {
+            case ITS_A_TRAP -> {
+                enemy.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 8 * 20, 0));
+                enemy.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 8 * 20, 0));
+            }
+            case COUNTER_OFFENSIVE -> {
+                for (Player p : defendingTeam.getOnlineMembers()) {
+                    if (p.getWorld().equals(world) && p.getLocation().distanceSquared(defendingTeam.getBedLocation()) <= (BASE_TRAP_RADIUS * BASE_TRAP_RADIUS)) {
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 10 * 20, 0));
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 10 * 20, 1));
+                    }
+                }
+            }
+            case ALARM -> {
+                enemy.removePotionEffect(PotionEffectType.INVISIBILITY);
+                for (Player p : defendingTeam.getOnlineMembers()) {
+                    p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
+                }
+            }
+            case MINER_FATIGUE -> {
+                enemy.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 10 * 20, 0));
+            }
+            default -> { }
+        }
+    }
+
+    /** Applies Haste (if team has it) and Regeneration at base (if team has Heal Pool). Call periodically. */
+    public void applyHasteAndHealPool(final Player player) {
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) return;
+        final Optional<ITeam> teamOpt = getTeam(player);
+        if (teamOpt.isEmpty()) return;
+        final TeamUpgradeState state = getTeamUpgradeState(teamOpt.get());
+        if (state == null) return;
+        final int haste = state.getHaste();
+        if (haste > 0) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 60, haste - 1, true, false));
+        }
+        if (state.hasHealPool()) {
+            final Location spawn = teamOpt.get().getSpawnLocation();
+            if (spawn != null && spawn.getWorld() != null && player.getWorld().equals(spawn.getWorld())
+                    && player.getLocation().distanceSquared(spawn) <= (HEAL_POOL_RADIUS * HEAL_POOL_RADIUS)) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 60, 0, true, false));
+            }
         }
     }
 

@@ -9,6 +9,7 @@ import com.kartersanamo.bedwars.arena.kit.ToolTier;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -48,7 +49,7 @@ public final class ShopTiers {
     }
 
     public static IContentTier sword(final Material swordType, final int cost, final Material currency) {
-        return new ItemTier(unbreakable(new ItemStack(swordType)), cost, currency);
+        return new SwordUpgradeTier(swordType, cost, currency);
     }
 
     public static IContentTier bow(final ItemStack bow, final int cost, final Material currency) {
@@ -350,7 +351,62 @@ public final class ShopTiers {
 
         @Override
         public void giveReward(final Player player, final IArena arena) {
-            player.getInventory().addItem(unbreakable(new ItemStack(Material.DIAMOND_SWORD)));
+            replaceFirstSwordWith(player.getInventory(), unbreakable(new ItemStack(Material.DIAMOND_SWORD)));
+        }
+    }
+
+    private static final Material[] SWORD_MATERIALS = {
+            Material.WOODEN_SWORD, Material.STONE_SWORD, Material.GOLDEN_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD
+    };
+
+    private static boolean isSword(final Material type) {
+        for (Material m : SWORD_MATERIALS) {
+            if (m == type) return true;
+        }
+        return false;
+    }
+
+    /** Replaces the first sword in the inventory with the new sword; if none found, adds the item. */
+    private static void replaceFirstSwordWith(final Inventory inv, final ItemStack newSword) {
+        for (int i = 0; i < inv.getSize(); i++) {
+            final ItemStack stack = inv.getItem(i);
+            if (stack != null && !stack.getType().isAir() && isSword(stack.getType())) {
+                inv.setItem(i, newSword);
+                return;
+            }
+        }
+        inv.addItem(newSword);
+    }
+
+    private static final class SwordUpgradeTier implements IContentTier {
+        private final ItemStack reward;
+        private final int cost;
+        private final Material currency;
+
+        SwordUpgradeTier(final Material swordType, final int cost, final Material currency) {
+            this.reward = unbreakable(new ItemStack(swordType));
+            this.cost = cost;
+            this.currency = currency;
+        }
+
+        @Override
+        public ItemStack getItem() {
+            return reward.clone();
+        }
+
+        @Override
+        public int getCost() {
+            return cost;
+        }
+
+        @Override
+        public Material getCurrency() {
+            return currency;
+        }
+
+        @Override
+        public void giveReward(final Player player, final IArena arena) {
+            replaceFirstSwordWith(player.getInventory(), reward.clone());
         }
     }
 }

@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -63,9 +64,6 @@ public final class SwordAndArmorEnforcementListener implements Listener {
         final ItemStack dropped = event.getItemDrop().getItemStack();
         if (isPermanentArmor(dropped)) {
             event.setCancelled(true);
-            if (arena instanceof com.kartersanamo.bedwars.arena.Arena a) {
-                a.reapplyArmorIfNeeded(player);
-            }
             return;
         }
         if (isSword(dropped.getType())) {
@@ -86,13 +84,12 @@ public final class SwordAndArmorEnforcementListener implements Listener {
             return;
         }
 
-        // Don't interfere with shop
+        // Don't interfere with shop or upgrades GUI
         final String title = event.getView().getTitle();
-        if (title != null && title.startsWith("Item Shop")) return;
+        if (title != null && (title.startsWith("Item Shop") || title.startsWith("Upgrades & Traps"))) return;
 
         final int rawSlot = event.getRawSlot();
         final Inventory top = event.getView().getTopInventory();
-        final Inventory bottom = event.getView().getBottomInventory();
         final ItemStack current = event.getCurrentItem();
         final ItemStack cursor = event.getCursor();
 
@@ -103,24 +100,14 @@ public final class SwordAndArmorEnforcementListener implements Listener {
         final int playerSlot = clickInPlayerInv ? rawSlot - sizeTop : -1;
         final boolean isArmorSlot = playerSlot >= 36 && playerSlot <= 39;
 
-        // Prevent taking permanent armor out of armor slots (moving to hotbar/main or to top inventory)
+        // Prevent any move that would take permanent armor off (cancel only; never reapply to avoid duplication)
         if (current != null && isPermanentArmor(current) && (isArmorSlot || isArmorSlotOf(current, player.getInventory()))) {
-            // They're trying to move armor out of its slot
-            if (clickInPlayerInv && isArmorSlot) {
-                event.setCancelled(true);
-                if (arena instanceof com.kartersanamo.bedwars.arena.Arena a) {
-                    a.reapplyArmorIfNeeded(player);
-                }
-                return;
-            }
-            // Cursor has armor and they're putting it somewhere else (e.g. chest)
-            if (cursor != null && isPermanentArmor(cursor)) {
-                event.setCancelled(true);
-                if (arena instanceof com.kartersanamo.bedwars.arena.Arena a) {
-                    a.reapplyArmorIfNeeded(player);
-                }
-                return;
-            }
+            event.setCancelled(true);
+            return;
+        }
+        if (cursor != null && isPermanentArmor(cursor) && (!clickInPlayerInv || playerSlot < 36 || playerSlot > 39)) {
+            event.setCancelled(true);
+            return;
         }
 
         // Prevent putting last sword or armor into top inventory (chest, barrel, etc.)
@@ -137,8 +124,32 @@ public final class SwordAndArmorEnforcementListener implements Listener {
             }
             if (moved != null && isPermanentArmor(moved)) {
                 event.setCancelled(true);
-                if (arena instanceof com.kartersanamo.bedwars.arena.Arena a) {
-                    a.reapplyArmorIfNeeded(player);
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onInventoryDrag(final InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        final IArena arena = plugin.getArenaManager().getArena(player);
+        if (arena == null) return;
+        if (arena.getGameState() != com.kartersanamo.bedwars.api.arena.EGameState.IN_GAME
+                && arena.getGameState() != com.kartersanamo.bedwars.api.arena.EGameState.ENDING) {
+            return;
+        }
+        final String title = event.getView().getTitle();
+        if (title != null && (title.startsWith("Item Shop") || title.startsWith("Upgrades & Traps"))) return;
+
+        final int sizeTop = event.getView().getTopInventory().getSize();
+        final ItemStack dragged = event.getOldCursor();
+        if (dragged == null || !isPermanentArmor(dragged)) return;
+
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= sizeTop) {
+                final int playerSlot = rawSlot - sizeTop;
+                if (playerSlot >= 36 && playerSlot <= 39) {
+                    event.setCancelled(true);
+                    return;
                 }
             }
         }

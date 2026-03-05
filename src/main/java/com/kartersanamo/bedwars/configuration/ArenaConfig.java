@@ -108,8 +108,9 @@ public final class ArenaConfig {
             final List<Location> ironGenerators = readLocationList(ConfigPath.Arena.TEAMS + "." + teamId + "." + ConfigPath.Arena.TEAM_IRON_GENERATORS);
             final List<Location> goldGenerators = readLocationList(ConfigPath.Arena.TEAMS + "." + teamId + "." + ConfigPath.Arena.TEAM_GOLD_GENERATORS);
             final Location shopNpc = readLocation(ConfigPath.Arena.TEAMS + "." + teamId + "." + ConfigPath.Arena.TEAM_SHOP_NPC);
+            final Location upgradeNpc = readLocation(ConfigPath.Arena.TEAMS + "." + teamId + "." + ConfigPath.Arena.TEAM_UPGRADE_NPC);
 
-            result.add(new TeamDefinition(teamId, color, spawn, bed, ironGenerators, goldGenerators, shopNpc));
+            result.add(new TeamDefinition(teamId, color, spawn, bed, ironGenerators, goldGenerators, shopNpc, upgradeNpc));
         }
 
         return result;
@@ -218,6 +219,7 @@ public final class ArenaConfig {
         private final List<Location> ironGenerators;
         private final List<Location> goldGenerators;
         private final Location shopNpc;
+        private final Location upgradeNpc;
 
         public TeamDefinition(final String id,
                               final ETeamColor color,
@@ -225,7 +227,8 @@ public final class ArenaConfig {
                               final Location bed,
                               final List<Location> ironGenerators,
                               final List<Location> goldGenerators,
-                              final Location shopNpc) {
+                              final Location shopNpc,
+                              final Location upgradeNpc) {
             this.id = id;
             this.color = color;
             this.spawn = spawn;
@@ -233,6 +236,7 @@ public final class ArenaConfig {
             this.ironGenerators = Collections.unmodifiableList(new ArrayList<>(ironGenerators));
             this.goldGenerators = Collections.unmodifiableList(new ArrayList<>(goldGenerators));
             this.shopNpc = shopNpc;
+            this.upgradeNpc = upgradeNpc;
         }
 
         public String getId() {
@@ -261,6 +265,10 @@ public final class ArenaConfig {
 
         public Location getShopNpc() {
             return shopNpc;
+        }
+
+        public Location getUpgradeNpc() {
+            return upgradeNpc;
         }
     }
 

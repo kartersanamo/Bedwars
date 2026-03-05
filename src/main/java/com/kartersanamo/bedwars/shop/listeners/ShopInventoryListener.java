@@ -2,9 +2,10 @@ package com.kartersanamo.bedwars.shop.listeners;
 
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.api.arena.shop.IContentTier;
+import com.kartersanamo.bedwars.shop.ShopInventoryHolder;
 import com.kartersanamo.bedwars.shop.ShopManager;
-import com.kartersanamo.bedwars.shop.main.ShopCategory;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -15,12 +16,12 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Handles interactions within the Bedwars shop inventories.
+ * Handles interactions in the 54-slot shop GUI: category row (0–8) switches view,
+ * content slots (9–53) purchase or add to Quick Buy.
  */
 public final class ShopInventoryListener implements Listener {
 
-    private static final String ROOT_TITLE = "Item Shop";
-    private static final String CATEGORY_TITLE_PREFIX = ROOT_TITLE + " - ";
+    private static final int CONTENT_START = 9;
 
     private final Bedwars plugin;
     private final ShopManager shopManager;
@@ -36,47 +37,46 @@ public final class ShopInventoryListener implements Listener {
             return;
         }
 
-        final String title = event.getView().getTitle();
-        if (!title.startsWith(ROOT_TITLE)) {
-            return;
-        }
-
-        final ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType() == Material.AIR) {
+        if (!(event.getInventory().getHolder() instanceof ShopInventoryHolder holder)) {
             return;
         }
 
         event.setCancelled(true);
 
-        if (ROOT_TITLE.equals(title)) {
-            handleRootClick(player, clicked);
-        } else if (title.startsWith(CATEGORY_TITLE_PREFIX)) {
-            final String categoryId = ChatColor.stripColor(title.substring(CATEGORY_TITLE_PREFIX.length())).trim().toLowerCase();
-            final int slot = event.getRawSlot();
-            final Inventory top = event.getView().getTopInventory();
-            if (slot >= 0 && slot < top.getSize()) {
-                final ShopCategory category = shopManager.getCategory(categoryId);
-                handleCategoryClick(player, category, slot);
-            }
+        final int rawSlot = event.getRawSlot();
+        final Inventory top = event.getView().getTopInventory();
+        if (rawSlot < 0 || rawSlot >= top.getSize()) {
+            return;
         }
-    }
 
-    private void handleRootClick(final Player player, final ItemStack clicked) {
-        for (ShopCategory category : shopManager.getCategories()) {
-            if (category.getIcon().isSimilar(clicked)) {
-                shopManager.openCategory(player, category);
-                return;
-            }
+        if (rawSlot < CONTENT_START) {
+            handleCategoryRowClick(player, rawSlot);
+            return;
         }
-    }
 
-    private void handleCategoryClick(final Player player, final ShopCategory category, final int slot) {
-        if (category == null) return;
-
-        final IContentTier tier = shopManager.getTierAtSlot(category, slot);
-        if (tier == null) return;
+        final int contentIndex = rawSlot - CONTENT_START;
+        final IContentTier tier = holder.getTierAtContentIndex(contentIndex);
+        if (tier == null) {
+            return;
+        }
 
         final IArena arena = plugin.getArenaManager().getArena(player);
+        if (event.isShiftClick()) {
+            // TODO: add to Quick Buy
+        } else {
+            tryPurchase(player, tier, arena);
+        }
+    }
+
+    private void handleCategoryRowClick(final Player player, final int navSlot) {
+        final String[] navOrder = shopManager.getNavOrder();
+        if (navSlot < 0 || navSlot >= navOrder.length) return;
+        final String viewId = navOrder[navSlot];
+        final IArena arena = plugin.getArenaManager().getArena(player);
+        shopManager.openView(player, viewId, arena);
+    }
+
+    private void tryPurchase(final Player player, final IContentTier tier, final IArena arena) {
         final int cost = tier.getCostFor(arena);
         final Material currency = tier.getCurrency();
 
@@ -88,7 +88,8 @@ public final class ShopInventoryListener implements Listener {
         }
 
         if (total < cost) {
-            player.sendMessage(ChatColor.RED + "You don't have enough " + formatCurrency(currency) + " (need " + cost + ").");
+            final int needMore = cost - total;
+            player.sendMessage(ChatColor.RED + "You don't have enough " + formatCurrencyDisplay(currency) + "! Need " + needMore + " more!");
             return;
         }
         if (!tier.canPurchase(player, arena)) {
@@ -111,7 +112,38 @@ public final class ShopInventoryListener implements Listener {
         }
 
         tier.giveReward(player, arena);
-        player.sendMessage(ChatColor.GREEN + "Purchased!");
+        if (arena instanceof Arena concreteArena) {
+            concreteArena.applyTeamUpgradesToInventory(player);
+        }
+        final String itemName = formatItemName(tier.getItem());
+        player.sendMessage(ChatColor.GREEN + "You purchased " + ChatColor.GOLD + itemName);
+    }
+
+    private static String formatItemName(final ItemStack item) {
+        if (item != null && item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+            return ChatColor.stripColor(item.getItemMeta().getDisplayName());
+        }
+        if (item != null && item.getType() != Material.AIR) {
+            final String[] words = item.getType().name().toLowerCase().split("_");
+            final StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < words.length; i++) {
+                if (i > 0) sb.append(" ");
+                if (!words[i].isEmpty()) {
+                    sb.append(Character.toUpperCase(words[i].charAt(0))).append(words[i].substring(1));
+                }
+            }
+            return sb.toString();
+        }
+        return "Item";
+    }
+
+    private static String formatCurrencyDisplay(final Material m) {
+        if (m == Material.IRON_INGOT) return "Iron";
+        if (m == Material.GOLD_INGOT) return "Gold";
+        if (m == Material.DIAMOND) return "Diamond";
+        if (m == Material.EMERALD) return "Emerald";
+        final String n = m.name().toLowerCase().replace("_", " ");
+        return n.isEmpty() ? n : Character.toUpperCase(n.charAt(0)) + n.substring(1);
     }
 
     private static String formatCurrency(final Material m) {

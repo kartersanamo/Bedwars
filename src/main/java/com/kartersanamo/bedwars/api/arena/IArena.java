@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * High-level arena contract used by the rest of the plugin.
@@ -76,6 +77,11 @@ public interface IArena {
     void handlePlayerDeath(Player player, Player killer);
 
     /**
+     * Records a kill for the given killer (for end-of-game summary). Call when a player gets a kill.
+     */
+    void recordKill(UUID killerUniqueId);
+
+    /**
      * Returns whether the player currently has spawn protection (invulnerability after respawn).
      */
     boolean hasSpawnProtection(Player player);
@@ -89,4 +95,27 @@ public interface IArena {
      * Resets the arena back to the lobby state after a game finishes.
      */
     void resetAfterGame();
+
+    /**
+     * Broadcasts the game-over summary (Bed Wars title, winner, top killers) to all players and spectators.
+     * Call when the game transitions to ENDING.
+     *
+     * @param winningTeam the last remaining team, or null if draw
+     */
+    void broadcastGameOverSummary(ITeam winningTeam);
+
+    /** Current diamond generator tier (1, 2, or 3). */
+    int getDiamondTier();
+
+    /** Current emerald generator tier (1, 2, or 3). */
+    int getEmeraldTier();
+
+    /** Effective spawn interval in ticks for diamond generators at current tier. */
+    int getEffectiveDiamondIntervalTicks();
+
+    /** Effective spawn interval in ticks for emerald generators at current tier. */
+    int getEffectiveEmeraldIntervalTicks();
+
+    /** Next tier upgrade line for scoreboard (e.g. "Diamond II in 5:36"); updates every second. */
+    String getNextTierUpgradeMessage();
 }

@@ -34,9 +34,10 @@ public final class GamePlayingTask extends BukkitRunnable {
 
         if (aliveTeams.size() <= 1) {
             arena.setGameState(EGameState.ENDING);
+            final ITeam winningTeam = aliveTeams.isEmpty() ? null : aliveTeams.get(0);
+            arena.broadcastGameOverSummary(winningTeam);
 
-            if (!aliveTeams.isEmpty()) {
-                final ITeam winningTeam = aliveTeams.get(0);
+            if (winningTeam != null) {
                 for (Player player : winningTeam.getOnlineMembers()) {
                     player.sendTitle("Victory!", "", 10, 60, 10);
                 }

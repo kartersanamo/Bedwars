@@ -72,6 +72,20 @@ public final class ConfigPath {
         public static final String EMERALD_INTERVAL_TICKS = "emerald.interval-ticks";
         public static final String EMERALD_MAX_ITEMS = "emerald.max-items";
 
+        /** Tier upgrade event times (seconds from game start). Order: Diamond II, Emerald II, Diamond III, Emerald III, Bed Break, Sudden Death. */
+        public static final String TIER_UPGRADE_DIAMOND_2 = "tier-upgrades.diamond-2-seconds";
+        public static final String TIER_UPGRADE_EMERALD_2 = "tier-upgrades.emerald-2-seconds";
+        public static final String TIER_UPGRADE_DIAMOND_3 = "tier-upgrades.diamond-3-seconds";
+        public static final String TIER_UPGRADE_EMERALD_3 = "tier-upgrades.emerald-3-seconds";
+        public static final String TIER_UPGRADE_BED_BREAK = "tier-upgrades.bed-break-seconds";
+        public static final String TIER_UPGRADE_SUDDEN_DEATH = "tier-upgrades.sudden-death-seconds";
+
+        /** Interval ticks per tier (diamond/emerald). Tier 2/3 use these; tier 1 uses base interval. */
+        public static final String DIAMOND_TIER_2_INTERVAL_TICKS = "diamond.tier-2-interval-ticks";
+        public static final String DIAMOND_TIER_3_INTERVAL_TICKS = "diamond.tier-3-interval-ticks";
+        public static final String EMERALD_TIER_2_INTERVAL_TICKS = "emerald.tier-2-interval-ticks";
+        public static final String EMERALD_TIER_3_INTERVAL_TICKS = "emerald.tier-3-interval-ticks";
+
         private Generators() {
         }
     }
@@ -115,6 +129,7 @@ public final class ConfigPath {
         public static final String TEAM_IRON_GENERATORS = "generator-iron";
         public static final String TEAM_GOLD_GENERATORS = "generator-gold";
         public static final String TEAM_SHOP_NPC = "shop-npc";
+        public static final String TEAM_UPGRADE_NPC = "upgrade-npc";
 
         public static final String DIAMOND_GENERATORS = "diamond-generators";
         public static final String EMERALD_GENERATORS = "emerald-generators";

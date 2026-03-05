@@ -2,7 +2,6 @@ package com.kartersanamo.bedwars.arena.tasks;
 
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -54,17 +53,27 @@ public final class GameStartingTask extends BukkitRunnable {
             return;
         }
 
-        // Announce only milestone seconds in chat.
-        if (secondsRemaining == 15
+        // Announce milestone seconds in chat and show big number as title.
+        if (secondsRemaining == 20
+                || secondsRemaining == 15
                 || secondsRemaining == 10
                 || secondsRemaining == 5
+                || secondsRemaining == 4
                 || secondsRemaining == 3
                 || secondsRemaining == 2
                 || secondsRemaining == 1) {
-            final String message = ChatColor.GREEN + "Game starting in " + secondsRemaining + " second"
-                    + (secondsRemaining == 1 ? "" : "s") + "...";
+            final ChatColor numberColor = secondsRemaining <= 5 ? ChatColor.RED : ChatColor.GOLD;
+            final String unit = secondsRemaining == 1 ? " second!" : " seconds!";
+            final String message = ChatColor.GOLD + "The game starts in " + numberColor + secondsRemaining
+                    + ChatColor.GOLD + unit;
+            final String subtitle = secondsRemaining == 1 ? "second" : "seconds";
             for (Player player : arena.getPlayers()) {
                 player.sendMessage(message);
+                player.sendTitle(
+                        numberColor.toString() + secondsRemaining,
+                        ChatColor.GRAY + subtitle,
+                        5, 25, 5
+                );
             }
         }
 

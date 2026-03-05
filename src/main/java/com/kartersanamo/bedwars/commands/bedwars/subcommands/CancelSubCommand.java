@@ -3,8 +3,9 @@ package com.kartersanamo.bedwars.commands.bedwars.subcommands;
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
+import com.kartersanamo.bedwars.arena.Arena;
+import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -76,6 +77,7 @@ public final class CancelSubCommand extends ASubCommand {
             arena.removePlayer(p, false);
             plugin.getArenaManager().playerLeftArena(p);
             plugin.getSidebarService().removeSidebar(p);
+            LobbyReturnItem.removeFrom(p);
         }
 
         arena.resetAfterGame();

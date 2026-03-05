@@ -30,7 +30,7 @@ public final class SwordAndArmorEnforcementListener implements Listener {
         this.plugin = plugin;
     }
 
-    private static boolean isSword(final Material type) {
+    public static boolean isSword(final Material type) {
         for (Material m : SWORDS) {
             if (m == type) return true;
         }
@@ -44,7 +44,7 @@ public final class SwordAndArmorEnforcementListener implements Listener {
                 || n.endsWith("_LEGGINGS") || n.endsWith("_BOOTS");
     }
 
-    private static int countSwords(final Inventory inv) {
+    public static int countSwords(final Inventory inv) {
         int count = 0;
         for (ItemStack s : inv.getContents()) {
             if (s != null && isSword(s.getType())) count += s.getAmount();

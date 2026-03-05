@@ -35,12 +35,15 @@ public final class GeneratorsConfig {
         configuration.addDefault(ConfigPath.Generators.EMERALD_INTERVAL_TICKS, 1200);
         configuration.addDefault(ConfigPath.Generators.EMERALD_MAX_ITEMS, 16);
 
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_2, 300);
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_2, 480);
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_3, 660);
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_3, 840);
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_BED_BREAK, 900);
-        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_SUDDEN_DEATH, 960);
+        // Global event timings (seconds from game start).
+        // 6 min: Diamond II, 12 min: Emerald II, 18 min: Diamond III,
+        // 24 min: Emerald III, 30 min: Bed Destruction, 40 min: Sudden Death.
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_2, 360);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_2, 720);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_DIAMOND_3, 1080);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_EMERALD_3, 1440);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_BED_BREAK, 1800);
+        configuration.addDefault(ConfigPath.Generators.TIER_UPGRADE_SUDDEN_DEATH, 2400);
 
         configuration.addDefault(ConfigPath.Generators.DIAMOND_TIER_2_INTERVAL_TICKS, 400);
         configuration.addDefault(ConfigPath.Generators.DIAMOND_TIER_3_INTERVAL_TICKS, 200);
@@ -104,6 +107,11 @@ public final class GeneratorsConfig {
 
     public int getTierUpgradeSuddenDeathSeconds() {
         return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_SUDDEN_DEATH, 960);
+    }
+
+    public int getTierUpgradeGameOverSeconds() {
+        // Default: 50 minutes (3000 seconds) from game start.
+        return configuration.getInt(ConfigPath.Generators.TIER_UPGRADE_GAME_OVER, 3000);
     }
 
     public int getDiamondTier2IntervalTicks() {

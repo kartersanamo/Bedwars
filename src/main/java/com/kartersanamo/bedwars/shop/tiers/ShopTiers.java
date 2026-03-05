@@ -254,6 +254,15 @@ public final class ShopTiers {
         }
 
         @Override
+        public boolean canPurchase(final Player player, final IArena arena) {
+            if (arena instanceof Arena a) {
+                // Only allow buying if this tier is strictly higher than current.
+                return a.getPlayerAxeTier(player).ordinal() < tier.ordinal();
+            }
+            return false;
+        }
+
+        @Override
         public void giveReward(final Player player, final IArena arena) {
             if (arena instanceof Arena a) {
                 a.setPlayerAxeTier(player, tier);
@@ -289,6 +298,15 @@ public final class ShopTiers {
         }
 
         @Override
+        public boolean canPurchase(final Player player, final IArena arena) {
+            if (arena instanceof Arena a) {
+                // Only allow buying if this tier is strictly higher than current.
+                return a.getPlayerPickaxeTier(player).ordinal() < tier.ordinal();
+            }
+            return false;
+        }
+
+        @Override
         public void giveReward(final Player player, final IArena arena) {
             if (arena instanceof Arena a) {
                 a.setPlayerPickaxeTier(player, tier);
@@ -317,6 +335,15 @@ public final class ShopTiers {
         @Override
         public Material getCurrency() {
             return Material.IRON_INGOT;
+        }
+
+        @Override
+        public boolean canPurchase(final Player player, final IArena arena) {
+            if (arena instanceof Arena a) {
+                // Permanent shears: only buy once.
+                return !a.hasShears(player);
+            }
+            return false;
         }
 
         @Override
@@ -350,6 +377,14 @@ public final class ShopTiers {
         }
 
         @Override
+        public boolean canPurchase(final Player player, final IArena arena) {
+            // Only allow if current best sword is weaker than diamond.
+            final int bestTier = bestSwordTier(player.getInventory());
+            final int thisTier = swordTierIndex(Material.DIAMOND_SWORD);
+            return bestTier < thisTier;
+        }
+
+        @Override
         public void giveReward(final Player player, final IArena arena) {
             replaceFirstSwordWith(player.getInventory(), unbreakable(new ItemStack(Material.DIAMOND_SWORD)));
         }
@@ -364,6 +399,25 @@ public final class ShopTiers {
             if (m == type) return true;
         }
         return false;
+    }
+
+    private static int swordTierIndex(final Material type) {
+        for (int i = 0; i < SWORD_MATERIALS.length; i++) {
+            if (SWORD_MATERIALS[i] == type) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static int bestSwordTier(final Inventory inv) {
+        int best = -1;
+        for (ItemStack stack : inv.getContents()) {
+            if (stack == null || stack.getType().isAir()) continue;
+            final int idx = swordTierIndex(stack.getType());
+            if (idx > best) best = idx;
+        }
+        return best;
     }
 
     /** Replaces the first sword in the inventory with the new sword; if none found, adds the item. */
@@ -402,6 +456,14 @@ public final class ShopTiers {
         @Override
         public Material getCurrency() {
             return currency;
+        }
+
+        @Override
+        public boolean canPurchase(final Player player, final IArena arena) {
+            // Prevent buying the same sword tier again or downgrading.
+            final int bestTier = bestSwordTier(player.getInventory());
+            final int thisTier = swordTierIndex(reward.getType());
+            return thisTier > bestTier;
         }
 
         @Override

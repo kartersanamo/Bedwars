@@ -104,6 +104,8 @@ public final class DeathListener implements Listener {
 
     private static void transferOresToKiller(final Player victim, final Player killer) {
         final List<ItemStack> ores = new ArrayList<>();
+        final HashMap<Material, Integer> gained = new HashMap<>();
+
         for (int i = 0; i < victim.getInventory().getStorageContents().length; i++) {
             final ItemStack stack = victim.getInventory().getItem(i);
             if (stack == null || stack.getType().isAir()) {
@@ -113,6 +115,7 @@ public final class DeathListener implements Listener {
                 if (stack.getType() == ore) {
                     ores.add(stack.clone());
                     victim.getInventory().setItem(i, null);
+                    gained.merge(ore, stack.getAmount(), Integer::sum);
                     break;
                 }
             }
@@ -126,6 +129,38 @@ public final class DeathListener implements Listener {
                     dropLocation.getWorld().dropItemNaturally(dropLocation, remainder);
                 }
             }
+        }
+
+        // Send per-ore gain messages to the killer, e.g. "+5 Iron".
+        for (Material ore : ORE_MATERIALS) {
+            final Integer amount = gained.get(ore);
+            if (amount == null || amount <= 0) {
+                continue;
+            }
+            final String oreName;
+            final ChatColor nameColor;
+            switch (ore) {
+                case IRON_INGOT -> {
+                    oreName = "Iron";
+                    nameColor = ChatColor.WHITE;
+                }
+                case GOLD_INGOT -> {
+                    oreName = "Gold";
+                    nameColor = ChatColor.GOLD;
+                }
+                case DIAMOND -> {
+                    oreName = "Diamond";
+                    nameColor = ChatColor.AQUA;
+                }
+                case EMERALD -> {
+                    oreName = "Emerald";
+                    nameColor = ChatColor.GREEN;
+                }
+                default -> {
+                    continue;
+                }
+            }
+            killer.sendMessage(ChatColor.GOLD + "+" + amount + " " + nameColor + oreName);
         }
     }
 }

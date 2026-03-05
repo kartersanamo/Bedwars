@@ -1,6 +1,7 @@
 package com.kartersanamo.bedwars;
 
 import com.kartersanamo.bedwars.api.IBedwars;
+import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.configuration.ConfigManager;
 import com.kartersanamo.bedwars.arena.ArenaManager;
 import com.kartersanamo.bedwars.arena.GeneratorItemTracker;
@@ -9,10 +10,15 @@ import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.SoundsConfig;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.database.SQLite;
+import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Objects;
 
 public final class Bedwars extends JavaPlugin implements IBedwars {
@@ -64,8 +70,10 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener(this, shopManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener(upgradeManager), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.sidebar.SidebarListener(sidebarService), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.lobby.LobbyReturnListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.gui.GameModeGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.SwordAndArmorEnforcementListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.ChestDepositListener(this), this);
         getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.HungerListener(this), this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
@@ -102,6 +110,44 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     @Override
     public void onDisable() {
+        // Cleanly end all active games and restore maps so next startup is fresh.
+        if (arenaManager != null && internalAdapter != null) {
+            final Location lobbySpawn = mainConfig != null ? mainConfig.getLobbySpawn() : null;
+            for (IArena arena : arenaManager.getArenas()) {
+                // Snapshot players before we start mutating arena state.
+                final Collection<Player> players = new ArrayList<>(arena.getPlayers());
+                final Collection<Player> spectators = new ArrayList<>(arena.getSpectators());
+
+                for (Player p : players) {
+                    if (lobbySpawn != null) {
+                        p.teleport(lobbySpawn);
+                    }
+                    arena.removePlayer(p, false);
+                    arenaManager.playerLeftArena(p);
+                    if (sidebarService != null) {
+                        sidebarService.removeSidebar(p);
+                    }
+                    LobbyReturnItem.removeFrom(p);
+                }
+
+                for (Player p : spectators) {
+                    if (lobbySpawn != null) {
+                        p.teleport(lobbySpawn);
+                    }
+                    arena.removePlayer(p, false);
+                    arenaManager.playerLeftArena(p);
+                    if (sidebarService != null) {
+                        sidebarService.removeSidebar(p);
+                    }
+                    LobbyReturnItem.removeFrom(p);
+                }
+
+                // Restore arena blocks back to their template state and reset internal state.
+                internalAdapter.restoreArena(arena);
+                arena.resetAfterGame();
+            }
+        }
+
         if (hologramManager != null) {
             hologramManager.clearAll();
         }

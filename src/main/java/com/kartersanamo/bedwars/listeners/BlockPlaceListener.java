@@ -6,6 +6,7 @@ import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
 import com.kartersanamo.bedwars.api.arena.generator.IGenerator;
 import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.arena.OreGenerator;
+import com.kartersanamo.bedwars.configuration.ArenaConfig;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -48,6 +49,17 @@ public final class BlockPlaceListener implements Listener {
 
         final Block block = event.getBlockPlaced();
         final Location location = block.getLocation();
+
+        // In the waiting lobby, disallow placing blocks outside the configured lobby-region
+        // bounding box for this arena.
+        if (arena.getGameState() == com.kartersanamo.bedwars.api.arena.EGameState.LOBBY_WAITING
+                || arena.getGameState() == com.kartersanamo.bedwars.api.arena.EGameState.STARTING) {
+            if (!isInsideLobbyRegion(location, concreteArena)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         if (!concreteArena.isInsideRegion(location)) {
             return;
         }
@@ -67,6 +79,36 @@ public final class BlockPlaceListener implements Listener {
 
         final InternalAdapter adapter = plugin.getInternalAdapter();
         adapter.markModified(arena, block);
+    }
+
+    private boolean isInsideLobbyRegion(final Location location, final Arena arena) {
+        if (location == null || location.getWorld() == null || !location.getWorld().equals(arena.getWorld())) {
+            return false;
+        }
+
+        final java.util.Optional<ArenaConfig.Region> lobbyRegionOpt = arena.getLobbyRegion();
+        if (lobbyRegionOpt.isEmpty()) {
+            return true; // No lobby-region configured; don't restrict placement.
+        }
+
+        final ArenaConfig.Region lobbyRegion = lobbyRegionOpt.get();
+        final Location pos1 = lobbyRegion.getPos1();
+        final Location pos2 = lobbyRegion.getPos2();
+
+        final int minX = Math.min(pos1.getBlockX(), pos2.getBlockX());
+        final int maxX = Math.max(pos1.getBlockX(), pos2.getBlockX());
+        final int minY = Math.min(pos1.getBlockY(), pos2.getBlockY());
+        final int maxY = Math.max(pos1.getBlockY(), pos2.getBlockY());
+        final int minZ = Math.min(pos1.getBlockZ(), pos2.getBlockZ());
+        final int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
+
+        final int x = location.getBlockX();
+        final int y = location.getBlockY();
+        final int z = location.getBlockZ();
+
+        return x >= minX && x <= maxX
+                && y >= minY && y <= maxY
+                && z >= minZ && z <= maxZ;
     }
 
     private boolean isInsideGeneratorProtection(final Location blockLoc, final IArena arena) {

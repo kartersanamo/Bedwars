@@ -39,4 +39,20 @@ public enum ETeamColor {
     public Material getWoolMaterial() {
         return woolMaterial;
     }
+
+    /**
+     * Bed material corresponding to this team color.
+     */
+    public Material getBedMaterial() {
+        return switch (this) {
+            case RED -> Material.RED_BED;
+            case BLUE -> Material.BLUE_BED;
+            case GREEN -> Material.LIME_BED;
+            case YELLOW -> Material.YELLOW_BED;
+            case AQUA -> Material.LIGHT_BLUE_BED;
+            case WHITE -> Material.WHITE_BED;
+            case PINK -> Material.PINK_BED;
+            case GRAY -> Material.GRAY_BED;
+        };
+    }
 }

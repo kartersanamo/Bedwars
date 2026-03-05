@@ -148,9 +148,14 @@ public final class ShopManager {
     public void openView(final Player player, final String viewId, final IArena arena) {
         final String title = viewTitle(viewId);
         final ShopCategory category = "quick_buy".equals(viewId) ? null : getCategory(viewId);
-        final List<IContentTier> contentTiers = "quick_buy".equals(viewId)
-                ? defaultQuickBuyTiers
-                : getContentTiersList(category);
+        final List<IContentTier> contentTiers;
+        if ("quick_buy".equals(viewId)) {
+            contentTiers = defaultQuickBuyTiers;
+        } else if ("tools".equals(viewId)) {
+            contentTiers = getToolsNextTiers(category, player, arena);
+        } else {
+            contentTiers = getContentTiersList(category);
+        }
         final ShopInventoryHolderImpl holder = new ShopInventoryHolderImpl(viewId, category, contentTiers);
         final Inventory inv = Bukkit.createInventory(holder, 54, title);
         holder.setInventory(inv);
@@ -229,6 +234,40 @@ public final class ShopManager {
             list.addAll(content.getTiers());
         }
         return list;
+    }
+
+    /**
+     * For the Tools category, only show the next upgrade tier for axe/pickaxe (incremental upgrades),
+     * plus a single permanent shears entry. This avoids showing all tiers at once.
+     */
+    private List<IContentTier> getToolsNextTiers(final ShopCategory category, final Player player, final IArena arena) {
+        if (category == null) return Collections.emptyList();
+        final List<IContentTier> result = new ArrayList<>();
+
+        for (CategoryContent content : category.getContents()) {
+            final String id = content.getId().toLowerCase(Locale.ROOT);
+
+            if ("axe".equals(id) || "pickaxe".equals(id)) {
+                IContentTier next = null;
+                for (IContentTier tier : content.getTiers()) {
+                    if (tier.canPurchase(player, arena)) {
+                        next = tier;
+                        break;
+                    }
+                }
+                if (next != null) {
+                    result.add(next);
+                }
+            } else {
+                // Shears or any other tools content: show the first tier (with canPurchase preventing re-buys).
+                final List<IContentTier> tiers = content.getTiers();
+                if (!tiers.isEmpty()) {
+                    result.add(tiers.get(0));
+                }
+            }
+        }
+
+        return result;
     }
 
     public Collection<ShopCategory> getCategories() {

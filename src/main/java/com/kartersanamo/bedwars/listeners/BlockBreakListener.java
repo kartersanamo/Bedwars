@@ -6,7 +6,6 @@ import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Bed;
@@ -47,14 +46,15 @@ public final class BlockBreakListener implements Listener {
         if (data instanceof Bed bedData) {
             final Block otherHalf = getOtherBedHalf(block, bedData);
 
-            for (ITeam team : concreteArena.getTeams()) {
-                final Block teamBedBlock = team.getBedLocation().getBlock();
-                if (teamBedBlock.equals(block) || teamBedBlock.equals(otherHalf)) {
-                    // Prevent breaking own bed.
-                    if (concreteArena.getTeam(player).map(t -> t == team).orElse(false)) {
-                        event.setCancelled(true);
-                        return;
-                    }
+                    for (ITeam team : concreteArena.getTeams()) {
+                        final Block teamBedBlock = team.getBedLocation().getBlock();
+                        if (teamBedBlock.equals(block) || teamBedBlock.equals(otherHalf)) {
+                            // Prevent breaking own bed.
+                            if (concreteArena.getTeam(player).map(t -> t == team).orElse(false)) {
+                                event.setCancelled(true);
+                                player.sendMessage(org.bukkit.ChatColor.RED + "You can't destroy your own bed!");
+                                return;
+                            }
 
                     // Enemy bed: mark as destroyed and prevent item drops.
                     concreteArena.handleBedDestroyed(team, player);

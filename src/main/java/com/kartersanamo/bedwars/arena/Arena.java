@@ -1,5 +1,6 @@
 package com.kartersanamo.bedwars.arena;
 
+import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.arena.generator.IGenerator;
@@ -7,32 +8,27 @@ import com.kartersanamo.bedwars.api.arena.team.ETeamColor;
 import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import com.kartersanamo.bedwars.arena.kit.ArmorTier;
 import com.kartersanamo.bedwars.arena.kit.ToolTier;
-import com.kartersanamo.bedwars.arena.team.BedwarsTeam;
 import com.kartersanamo.bedwars.arena.tasks.GamePlayingTask;
 import com.kartersanamo.bedwars.arena.tasks.GameRestartingTask;
 import com.kartersanamo.bedwars.arena.tasks.GameStartingTask;
-import com.kartersanamo.bedwars.sidebar.SidebarService;
-import com.kartersanamo.bedwars.upgrades.TeamUpgradeState;
-import com.kartersanamo.bedwars.upgrades.TrapType;
-import com.kartersanamo.bedwars.Bedwars;
+import com.kartersanamo.bedwars.arena.team.BedwarsTeam;
 import com.kartersanamo.bedwars.configuration.ArenaConfig;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import com.kartersanamo.bedwars.upgrades.TeamUpgradeState;
+import com.kartersanamo.bedwars.upgrades.TrapType;
+import org.bukkit.*;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import org.bukkit.Sound;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.*;
 
@@ -81,6 +77,9 @@ public final class Arena implements IArena {
     /** Per-team diamond upgrade and trap state. */
     private final Map<String, TeamUpgradeState> teamUpgradeStates = new HashMap<>();
 
+    /** Active dragons spawned for Sudden Death per team (teamId -> dragon UUIDs). */
+    private final Map<String, List<UUID>> teamDragonIds = new HashMap<>();
+
     /** Players currently inside an enemy base (teamId -> set of player UUIDs) for trap trigger cooldown. */
     private final Map<String, Set<UUID>> playersInsideEnemyBase = new HashMap<>();
 
@@ -100,6 +99,8 @@ public final class Arena implements IArena {
     private int diamondTier = 1;
     private int emeraldTier = 1;
     private GeneratorPhase generatorPhase = GeneratorPhase.NORMAL;
+    private boolean suddenDeathStarted;
+    private boolean gameOverWarningSent;
 
     private Arena(final String id,
                   final String displayName,
@@ -127,6 +128,7 @@ public final class Arena implements IArena {
         this.plugin = plugin;
         for (ITeam t : teams) {
             this.teamUpgradeStates.put(t.getId(), new TeamUpgradeState());
+            this.teamDragonIds.put(t.getId(), new ArrayList<>());
         }
     }
 
@@ -176,6 +178,9 @@ public final class Arena implements IArena {
             final Location rawBed = def.getBed();
             final Location bed = new Location(world, rawBed.getX(), rawBed.getY(), rawBed.getZ(),
                     rawBed.getYaw(), rawBed.getPitch());
+
+            // Ensure the physical bed block matches the team color (e.g. RED_BED for red team).
+            applyTeamBedColor(world, bed, def.getColor());
 
             teams.add(new BedwarsTeam(def.getId(), def.getColor(), spawn, bed, plugin));
         }
@@ -465,16 +470,241 @@ public final class Arena implements IArena {
     }
 
     private static void sendGameStartIntro(final Player player) {
-        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
         player.sendMessage(separator);
-        player.sendMessage(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars");
+        player.sendMessage(centerChat(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars"));
         player.sendMessage("");
-        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Protect your bed and destroy the enemy beds.");
-        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Upgrade yourself and your team by collecting");
-        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "Iron, Gold, Emerald and Diamond from generators");
-        player.sendMessage(ChatColor.YELLOW + "" + ChatColor.BOLD + "to access powerful upgrades.");
+        player.sendMessage(centerChat(ChatColor.YELLOW + "" + ChatColor.BOLD + "Protect your bed and destroy the enemy beds."));
+        player.sendMessage(centerChat(ChatColor.YELLOW + "" + ChatColor.BOLD + "Upgrade yourself and your team by collecting"));
+        player.sendMessage(centerChat(ChatColor.YELLOW + "" + ChatColor.BOLD + "Iron, Gold, Emerald and Diamond from generators"));
+        player.sendMessage(centerChat(ChatColor.YELLOW + "" + ChatColor.BOLD + "to access powerful upgrades."));
         player.sendMessage("");
         player.sendMessage(separator);
+    }
+
+    /**
+     * Recolors the bed at the given location so that both halves use the team's bed color
+     * while preserving head/foot parts and facing, so it looks like a normal bed.
+     */
+    private static void applyTeamBedColor(final World world, final Location bedLocation, final ETeamColor color) {
+        if (world == null || bedLocation == null || bedLocation.getWorld() == null) {
+            return;
+        }
+        final Block block = world.getBlockAt(bedLocation);
+        final BlockData data = block.getBlockData();
+        if (!(data instanceof Bed bedData)) {
+            return;
+        }
+        final Block otherHalf = getOtherBedHalf(block, bedData);
+        final org.bukkit.Material bedMaterial = color.getBedMaterial();
+        final org.bukkit.block.data.type.Bed.Part part1 = bedData.getPart();
+        final org.bukkit.block.BlockFace facing = bedData.getFacing();
+
+        // Determine part of the other half from its current data (if it's a bed), otherwise infer.
+        Bed otherData = null;
+        if (otherHalf.getBlockData() instanceof Bed od) {
+            otherData = od;
+        }
+        final org.bukkit.block.data.type.Bed.Part part2 = otherData != null
+                ? otherData.getPart()
+                : (part1 == Bed.Part.HEAD ? Bed.Part.FOOT : Bed.Part.HEAD);
+
+        final Bed newFirst = (Bed) Bukkit.createBlockData(bedMaterial);
+        newFirst.setFacing(facing);
+        newFirst.setPart(part1);
+
+        final Bed newSecond = (Bed) Bukkit.createBlockData(bedMaterial);
+        newSecond.setFacing(facing);
+        newSecond.setPart(part2);
+
+        block.setBlockData(newFirst, false);
+        otherHalf.setBlockData(newSecond, false);
+    }
+
+    private static Block getOtherBedHalf(final Block block, final Bed bedData) {
+        final org.bukkit.block.BlockFace facing = bedData.getFacing();
+        final org.bukkit.block.BlockFace offset;
+        if (bedData.getPart() == Bed.Part.HEAD) {
+            offset = facing.getOppositeFace();
+        } else {
+            offset = facing;
+        }
+        return block.getRelative(offset);
+    }
+
+    /**
+     * Called when the global Bed Break event triggers. Destroys all remaining beds
+     * (both halves, marking them for map restore) and routes through the normal
+     * bed-destroyed flow so titles and chat are sent.
+     */
+    private void handleGlobalBedBreak() {
+        final Bedwars bw = plugin instanceof Bedwars ? (Bedwars) plugin : Bedwars.getInstance();
+        if (bw == null) {
+            return;
+        }
+        final com.kartersanamo.bedwars.maprestore.InternalAdapter adapter = bw.getInternalAdapter();
+
+        for (ITeam team : teams) {
+            if (team.isBedDestroyed()) {
+                continue;
+            }
+            final Location bedLoc = team.getBedLocation();
+            if (bedLoc == null || bedLoc.getWorld() == null || !bedLoc.getWorld().equals(world)) {
+                continue;
+            }
+            final Block bedBlock = world.getBlockAt(bedLoc);
+            final BlockData data = bedBlock.getBlockData();
+            if (data instanceof Bed bedData) {
+                final Block otherHalf = getOtherBedHalf(bedBlock, bedData);
+                adapter.markModified(this, bedBlock);
+                adapter.markModified(this, otherHalf);
+                bedBlock.setType(org.bukkit.Material.AIR, false);
+                otherHalf.setType(org.bukkit.Material.AIR, false);
+            } else {
+                adapter.markModified(this, bedBlock);
+                bedBlock.setType(org.bukkit.Material.AIR, false);
+            }
+            // breaker = null so no player stats, but titles/chat still fire.
+            handleBedDestroyed(team, null);
+        }
+    }
+
+    private void startSuddenDeath() {
+        if (suddenDeathStarted) {
+            return;
+        }
+        suddenDeathStarted = true;
+
+        // Cinematic announcement.
+        for (Player p : getPlayers()) {
+            p.sendTitle(ChatColor.DARK_RED + "☠ SUDDEN DEATH ☠",
+                    ChatColor.YELLOW + "Dragons have been unleashed!", 10, 80, 10);
+            p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "SUDDEN DEATH > "
+                    + ChatColor.YELLOW + "Ender Dragons have spawned!");
+            // Feather Falling effect for the whole phase.
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 60 * 10, 0, true, false));
+        }
+        for (Player p : getSpectators()) {
+            p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "SUDDEN DEATH > "
+                    + ChatColor.YELLOW + "Ender Dragons have spawned!");
+        }
+
+        // One dragon per non-eliminated team at start.
+        for (ITeam team : teams) {
+            if (team.isEliminated()) {
+                continue;
+            }
+            spawnDragonForTeam(team);
+        }
+    }
+
+    private void updateSuddenDeathDragons(final long elapsedSeconds, final GeneratorsConfig config) {
+        final int suddenDeathAt = config.getTierUpgradeSuddenDeathSeconds();
+        final long sinceSuddenDeath = Math.max(0, elapsedSeconds - suddenDeathAt);
+
+        // 0–5 min of Sudden Death: 1 dragon per team; after 5 min: 2 dragons per team.
+        final int targetPerTeam = sinceSuddenDeath >= 300 ? 2 : 1;
+
+        for (ITeam team : teams) {
+            if (team.isEliminated()) {
+                continue;
+            }
+            ensureDragonCountForTeam(team, targetPerTeam);
+        }
+    }
+
+    private void ensureDragonCountForTeam(final ITeam team, final int target) {
+        final List<UUID> list = teamDragonIds.computeIfAbsent(team.getId(), k -> new ArrayList<>());
+        final Iterator<UUID> it = list.iterator();
+        while (it.hasNext()) {
+            final UUID id = it.next();
+            final org.bukkit.entity.Entity e = Bukkit.getEntity(id);
+            if (!(e instanceof org.bukkit.entity.EnderDragon dragon) || dragon.isDead()) {
+                it.remove();
+            }
+        }
+        int count = list.size();
+        while (count < target) {
+            final UUID id = spawnDragonForTeam(team);
+            if (id == null) {
+                break;
+            }
+            list.add(id);
+            count++;
+        }
+    }
+
+    private UUID spawnDragonForTeam(final ITeam team) {
+        if (world == null) {
+            return null;
+        }
+        final Location base = team.getSpawnLocation();
+        if (base == null || base.getWorld() == null || !base.getWorld().equals(world)) {
+            return null;
+        }
+        final Location spawn = base.clone().add(0.0, 25.0, 0.0);
+        final org.bukkit.entity.EnderDragon dragon = world.spawn(spawn, org.bukkit.entity.EnderDragon.class, d -> {
+            d.setCustomNameVisible(true);
+            d.setCustomName(team.getColor().getChatColor() + team.getId() + " Dragon");
+        });
+        return dragon.getUniqueId();
+    }
+
+    private void despawnAllTeamDragons() {
+        if (world == null) {
+            return;
+        }
+        for (List<UUID> list : teamDragonIds.values()) {
+            for (UUID id : list) {
+                final org.bukkit.entity.Entity e = Bukkit.getEntity(id);
+                if (e != null && !e.isDead()) {
+                    e.remove();
+                }
+            }
+        }
+    }
+
+    /**
+     * Ends the game due to the absolute time cap being reached. All surviving teams/players
+     * are treated as winners for stats; broadcast summary with no single winning team.
+     */
+    private void endGameAsDraw() {
+        if (gameState == EGameState.ENDING || gameState == EGameState.RESETTING) {
+            return;
+        }
+        gameState = EGameState.ENDING;
+
+        // Treat all non-eliminated teams as "winners" for stats purposes.
+        broadcastGameOverSummary(null);
+        if (playingTask != null) {
+            playingTask.cancel();
+            playingTask = null;
+        }
+        final Bedwars bedwars = plugin instanceof Bedwars ? (Bedwars) plugin : Bedwars.getInstance();
+        if (bedwars != null) {
+            new GameRestartingTask(bedwars, this, 10).runTaskTimer(plugin, 20L, 20L);
+        }
+    }
+
+    /**
+     * Roughly center a chat line by prefixing spaces based on its visible length.
+     * This mimics Hypixel-style centered intro text.
+     */
+    private static String centerChat(final String message) {
+        final String stripped = ChatColor.stripColor(message);
+        // Typical Minecraft chat fits ~55 characters comfortably; use that as a baseline.
+        final int chatWidth = 55;
+        final int msgLength = stripped != null ? stripped.length() : 0;
+        final int padding = Math.max(0, (chatWidth - msgLength) / 2);
+        if (padding == 0) {
+            return message;
+        }
+        final StringBuilder sb = new StringBuilder(padding + message.length());
+        for (int i = 0; i < padding; i++) {
+            sb.append(' ');
+        }
+        sb.append(message);
+        return sb.toString();
     }
 
     private static final int RESPAWN_SPECTATOR_SECONDS = 3;
@@ -579,19 +809,33 @@ public final class Arena implements IArena {
     @Override
     public void handleBedDestroyed(final ITeam victimTeam, final Player breaker) {
         victimTeam.setBedDestroyed(true);
-        recordBedBroken(breaker.getUniqueId());
-        if (plugin instanceof Bedwars bw) {
-            try {
-                bw.getDatabase().getCachedStats(breaker.getUniqueId(), breaker.getName()).incrementBedsBroken();
-            } catch (Exception ignored) {
+        if (breaker != null) {
+            recordBedBroken(breaker.getUniqueId());
+            if (plugin instanceof Bedwars bw) {
+                try {
+                    bw.getDatabase().getCachedStats(breaker.getUniqueId(), breaker.getName()).incrementBedsBroken();
+                } catch (Exception ignored) {
+                }
             }
         }
         final String colorName = victimTeam.getColor().name().charAt(0) + victimTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
 
-        final String message = ChatColor.WHITE.toString() + ChatColor.BOLD + "BED DESTRUCTION > "
-                + victimTeam.getColor().getChatColor() + colorName + " Bed"
-                + ChatColor.GRAY + " was destroyed by "
-                + breaker.getName() + "!";
+        // Notify players on the destroyed team with a title.
+        for (Player p : victimTeam.getOnlineMembers()) {
+            p.sendTitle(ChatColor.RED + "BED DESTROYED", ChatColor.WHITE + "You will no longer respawn", 10, 60, 10);
+        }
+
+        final String message;
+        if (breaker != null) {
+            message = ChatColor.WHITE.toString() + ChatColor.BOLD + "BED DESTRUCTION > "
+                    + victimTeam.getColor().getChatColor() + colorName + " Bed"
+                    + ChatColor.GRAY + " was destroyed by "
+                    + breaker.getName() + "!";
+        } else {
+            message = ChatColor.WHITE.toString() + ChatColor.BOLD + "BED DESTRUCTION > "
+                    + victimTeam.getColor().getChatColor() + colorName + " Bed"
+                    + ChatColor.GRAY + " was destroyed!";
+        }
         for (Player p : getPlayers()) {
             p.sendMessage("");
             p.sendMessage(message);
@@ -633,6 +877,10 @@ public final class Arena implements IArena {
         diamondTier = 1;
         emeraldTier = 1;
         generatorPhase = GeneratorPhase.NORMAL;
+        suddenDeathStarted = false;
+        gameOverWarningSent = false;
+        despawnAllTeamDragons();
+        teamDragonIds.values().forEach(List::clear);
         gameState = EGameState.LOBBY_WAITING;
     }
 
@@ -641,7 +889,7 @@ public final class Arena implements IArena {
      * Call after a player is eliminated (final kill) and from GamePlayingTask.
      */
     public void checkGameOver() {
-        if (gameState != EGameState.IN_GAME) {
+        if (gameState != EGameState.IN_GAME && gameState != EGameState.ENDING) {
             return;
         }
         final List<ITeam> aliveTeams = teams.stream()
@@ -688,9 +936,28 @@ public final class Arena implements IArena {
         }
         if (generatorPhase == GeneratorPhase.NORMAL && elapsedSeconds >= config.getTierUpgradeBedBreakSeconds()) {
             generatorPhase = GeneratorPhase.BED_BREAK;
+            handleGlobalBedBreak();
         }
         if (generatorPhase != GeneratorPhase.SUDDEN_DEATH && elapsedSeconds >= config.getTierUpgradeSuddenDeathSeconds()) {
             generatorPhase = GeneratorPhase.SUDDEN_DEATH;
+            startSuddenDeath();
+        }
+
+        if (generatorPhase == GeneratorPhase.SUDDEN_DEATH) {
+            updateSuddenDeathDragons(elapsedSeconds, config);
+        }
+
+        // Absolute game-time cap: after Sudden Death has been running for 10 minutes (total 50 minutes from start),
+        // end the game as a draw. All remaining players are treated as winners for stats.
+        final int gameOverAt = config.getTierUpgradeGameOverSeconds();
+        if (!gameOverWarningSent && elapsedSeconds >= gameOverAt - 60) {
+            gameOverWarningSent = true;
+            for (Player p : getPlayers()) {
+                p.sendMessage(ChatColor.RED + "" + ChatColor.BOLD + "Game ends in 1 minute!");
+            }
+        }
+        if (elapsedSeconds >= gameOverAt) {
+            endGameAsDraw();
         }
     }
 
@@ -762,7 +1029,9 @@ public final class Arena implements IArena {
             final long rem = Math.max(0, at - elapsedSeconds);
             return ChatColor.WHITE + "Sudden Death in " + ChatColor.GREEN + formatTime(rem);
         }
-        return ChatColor.GRAY + "Sudden Death";
+        final int gameOverAt = config.getTierUpgradeGameOverSeconds();
+        final long rem = Math.max(0, gameOverAt - elapsedSeconds);
+        return ChatColor.WHITE + "Game Over in " + ChatColor.GREEN + formatTime(rem);
     }
 
     private static String formatTime(final long totalSeconds) {
@@ -1159,9 +1428,7 @@ public final class Arena implements IArena {
                     p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
                 }
             }
-            case MINER_FATIGUE -> {
-                enemy.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 10 * 20, 0));
-            }
+            case MINER_FATIGUE -> enemy.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 10 * 20, 0));
             default -> { }
         }
     }

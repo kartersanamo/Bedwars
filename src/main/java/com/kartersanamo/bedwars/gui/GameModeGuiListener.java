@@ -4,6 +4,7 @@ import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameMode;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -69,6 +70,9 @@ public final class GameModeGuiListener implements Listener {
         }
 
         plugin.getArenaManager().playerJoinedArena(player, arena);
+
+        // Give waiting-lobby \"Return to Lobby\" item.
+        LobbyReturnItem.giveTo(player);
 
         // Team assignment happens when the game starts (countdown reaches zero).
         player.teleport(arena.getLobbySpawn());

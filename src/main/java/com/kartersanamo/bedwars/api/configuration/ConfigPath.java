@@ -2,7 +2,7 @@ package com.kartersanamo.bedwars.api.configuration;
 
 /**
  * Centralised configuration path constants used across the plugin.
- *
+ * <p>
  * This avoids scattering raw string literals and keeps configuration structure
  * discoverable in a single place. Only paths that are used from Java code
  * should live here.
@@ -26,7 +26,6 @@ public final class ConfigPath {
         public static final String GAME_RESPAWN_DELAY_SECONDS = "gameplay.respawn-delay-seconds";
         public static final String GAME_VOID_Y = "gameplay.void-y";
 
-        public static final String GENERATOR_CAPS_ROOT = "gameplay.generator-caps";
         public static final String GENERATOR_CAPS_SOLO_IRON = "gameplay.generator-caps.solo.iron";
         public static final String GENERATOR_CAPS_SOLO_GOLD = "gameplay.generator-caps.solo.gold";
         public static final String GENERATOR_CAPS_SOLO_DIAMOND = "gameplay.generator-caps.solo.diamond";
@@ -72,13 +71,14 @@ public final class ConfigPath {
         public static final String EMERALD_INTERVAL_TICKS = "emerald.interval-ticks";
         public static final String EMERALD_MAX_ITEMS = "emerald.max-items";
 
-        /** Tier upgrade event times (seconds from game start). Order: Diamond II, Emerald II, Diamond III, Emerald III, Bed Break, Sudden Death. */
+        /** Tier upgrade event times (seconds from game start). Order: Diamond II, Emerald II, Diamond III, Emerald III, Bed Break, Sudden Death, Game Over. */
         public static final String TIER_UPGRADE_DIAMOND_2 = "tier-upgrades.diamond-2-seconds";
         public static final String TIER_UPGRADE_EMERALD_2 = "tier-upgrades.emerald-2-seconds";
         public static final String TIER_UPGRADE_DIAMOND_3 = "tier-upgrades.diamond-3-seconds";
         public static final String TIER_UPGRADE_EMERALD_3 = "tier-upgrades.emerald-3-seconds";
         public static final String TIER_UPGRADE_BED_BREAK = "tier-upgrades.bed-break-seconds";
         public static final String TIER_UPGRADE_SUDDEN_DEATH = "tier-upgrades.sudden-death-seconds";
+        public static final String TIER_UPGRADE_GAME_OVER = "tier-upgrades.game-over-seconds";
 
         /** Interval ticks per tier (diamond/emerald). Tier 2/3 use these; tier 1 uses base interval. */
         public static final String DIAMOND_TIER_2_INTERVAL_TICKS = "diamond.tier-2-interval-ticks";

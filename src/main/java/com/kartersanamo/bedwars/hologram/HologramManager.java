@@ -23,6 +23,7 @@ public final class HologramManager {
     private final Bedwars plugin;
     private final Map<IGenerator, List<ArmorStand>> hologramsByGenerator = new HashMap<>();
     private final Map<IGenerator, ArmorStand> rotatingBlockByGenerator = new HashMap<>();
+    private final Map<Location, List<ArmorStand>> depositHologramsByBlock = new HashMap<>();
 
     public HologramManager(final Bedwars plugin) {
         this.plugin = plugin;
@@ -65,6 +66,14 @@ public final class HologramManager {
             }
         }
         rotatingBlockByGenerator.clear();
+        for (List<ArmorStand> stands : depositHologramsByBlock.values()) {
+            for (ArmorStand stand : stands) {
+                if (stand != null && !stand.isDead()) {
+                    stand.remove();
+                }
+            }
+        }
+        depositHologramsByBlock.clear();
     }
 
     private List<ArmorStand> createHologram(final IGenerator generator) {
@@ -166,6 +175,46 @@ public final class HologramManager {
             case 3 -> "III";
             default -> String.valueOf(value);
         };
+    }
+
+    /**
+     * Ensures a static two-line hologram exists above a chest/ender chest saying:
+     * "PUNCH TO" (line 1) and "DEPOSIT" (line 2).
+     */
+    public void ensureDepositHologram(final Location blockLocation) {
+        if (blockLocation == null || blockLocation.getWorld() == null) {
+            return;
+        }
+        final Location key = new Location(blockLocation.getWorld(),
+                blockLocation.getBlockX(), blockLocation.getBlockY(), blockLocation.getBlockZ());
+        if (depositHologramsByBlock.containsKey(key)) {
+            return;
+        }
+        final List<ArmorStand> stands = new ArrayList<>(2);
+        final double x = key.getBlockX() + 0.5;
+        final double baseY = key.getBlockY() + 1.8;
+        final double z = key.getBlockZ() + 0.5;
+
+        final ArmorStand line1 = key.getWorld().spawn(new Location(key.getWorld(), x, baseY, z), ArmorStand.class, armorStand -> {
+            armorStand.setMarker(true);
+            armorStand.setInvisible(true);
+            armorStand.setGravity(false);
+            armorStand.setCustomNameVisible(true);
+            armorStand.setSmall(true);
+            armorStand.setCustomName(ChatColor.GRAY + "PUNCH TO");
+        });
+        final ArmorStand line2 = key.getWorld().spawn(new Location(key.getWorld(), x, baseY - 0.25, z), ArmorStand.class, armorStand -> {
+            armorStand.setMarker(true);
+            armorStand.setInvisible(true);
+            armorStand.setGravity(false);
+            armorStand.setCustomNameVisible(true);
+            armorStand.setSmall(true);
+            armorStand.setCustomName(ChatColor.GRAY + "DEPOSIT");
+        });
+
+        stands.add(line1);
+        stands.add(line2);
+        depositHologramsByBlock.put(key, stands);
     }
 }
 

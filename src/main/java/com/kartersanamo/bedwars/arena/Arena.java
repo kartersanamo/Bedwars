@@ -579,14 +579,17 @@ public final class Arena implements IArena {
         for (Player p : getPlayers()) {
             p.sendTitle(ChatColor.DARK_RED + "☠ SUDDEN DEATH ☠",
                     ChatColor.YELLOW + "Dragons have been unleashed!", 10, 80, 10);
+            p.sendMessage(ChatColor.GRAY + " ");
             p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "SUDDEN DEATH > "
                     + ChatColor.YELLOW + "Ender Dragons have spawned!");
+            p.sendMessage(ChatColor.GRAY + " ");
             // Feather Falling effect for the whole phase.
-            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 60 * 10, 0, true, false));
         }
         for (Player p : getSpectators()) {
+            p.sendMessage(ChatColor.GRAY + " ");
             p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "SUDDEN DEATH > "
                     + ChatColor.YELLOW + "Ender Dragons have spawned!");
+            p.sendMessage(ChatColor.GRAY + " ");
         }
 
         // One dragon per non-eliminated team at start.
@@ -763,15 +766,27 @@ public final class Arena implements IArena {
         player.sendMessage(ChatColor.YELLOW + "You will respawn in " + RESPAWN_SPECTATOR_SECONDS + " seconds!");
         for (int s = RESPAWN_SPECTATOR_SECONDS - 1; s >= 1; s--) {
             final int secondsLeft = s;
-            final String msg = s == 1
-                    ? ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + "1" + ChatColor.YELLOW + " second!"
-                    : ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + secondsLeft + ChatColor.YELLOW + " seconds!";
-            Bukkit.getScheduler().runTaskLater(plugin, () -> player.sendMessage(msg), (RESPAWN_SPECTATOR_SECONDS - secondsLeft) * 20L);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!players.contains(player.getUniqueId())) {
+                    return;
+                }
+                final String msg = secondsLeft == 1
+                        ? ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + "1" + ChatColor.YELLOW + " second!"
+                        : ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + secondsLeft + ChatColor.YELLOW + " seconds!";
+                player.sendMessage(msg);
+                player.sendTitle(
+                        ChatColor.RED + "YOU DIED!",
+                        ChatColor.YELLOW + "You will respawn in " + ChatColor.RED + secondsLeft
+                                + ChatColor.YELLOW + (secondsLeft == 1 ? " second!" : " seconds!"),
+                        0, 40, 10
+                );
+            }, (RESPAWN_SPECTATOR_SECONDS - secondsLeft) * 20L);
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             respawnAtBase(player);
             if (players.contains(player.getUniqueId())) {
                 player.sendMessage(ChatColor.YELLOW + "You have respawned!");
+                player.sendTitle(ChatColor.GREEN + "RESPAWNED", "", 0, 20, 10);
             }
         }, RESPAWN_SPECTATOR_SECONDS * 20L);
     }
@@ -1075,27 +1090,35 @@ public final class Arena implements IArena {
 
     @Override
     public void broadcastGameOverSummary(final ITeam winningTeam) {
-        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+        final String separator = ChatColor.GREEN + "--------------------";
+
         for (Player p : getPlayers()) {
+            if (winningTeam != null && winningTeam.getOnlineMembers().contains(p)) {
+                p.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!", "", 10, 70, 20);
+            }
             p.sendMessage(separator);
             p.sendMessage(ChatColor.WHITE + "Bed Wars");
+            p.sendMessage(separator);
             if (winningTeam != null) {
                 final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
                 final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
-                p.sendMessage(ChatColor.WHITE + colorName + " - " + names);
+                p.sendMessage(winningTeam.getColor().getChatColor() + colorName + ChatColor.WHITE + " - " + names);
             }
             sendKillerStats(p);
+            p.sendMessage(ChatColor.GREEN + "Thanks for playing!");
             p.sendMessage(separator);
         }
         for (Player p : getSpectators()) {
             p.sendMessage(separator);
             p.sendMessage(ChatColor.WHITE + "Bed Wars");
+            p.sendMessage(separator);
             if (winningTeam != null) {
                 final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
                 final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
-                p.sendMessage(ChatColor.WHITE + colorName + " - " + names);
+                p.sendMessage(winningTeam.getColor().getChatColor() + colorName + ChatColor.WHITE + " - " + names);
             }
             sendKillerStats(p);
+            p.sendMessage(ChatColor.GREEN + "Thanks for playing!");
             p.sendMessage(separator);
         }
     }

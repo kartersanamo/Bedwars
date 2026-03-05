@@ -49,6 +49,10 @@ public final class GameRestartingTask extends BukkitRunnable {
             }
 
             player.getInventory().clear();
+            player.getInventory().setHelmet(null);
+            player.getInventory().setChestplate(null);
+            player.getInventory().setLeggings(null);
+            player.getInventory().setBoots(null);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             plugin.getSidebarService().removeSidebar(player);
@@ -60,6 +64,10 @@ public final class GameRestartingTask extends BukkitRunnable {
         }
         for (Player spectator : arena.getSpectators()) {
             plugin.getSidebarService().removeSidebar(spectator);
+            spectator.getInventory().setHelmet(null);
+            spectator.getInventory().setChestplate(null);
+            spectator.getInventory().setLeggings(null);
+            spectator.getInventory().setBoots(null);
             if (plugin.getMainConfig().getLobbySpawn() != null) {
                 spectator.teleport(plugin.getMainConfig().getLobbySpawn());
             }

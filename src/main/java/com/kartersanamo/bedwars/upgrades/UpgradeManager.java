@@ -21,21 +21,34 @@ import java.util.List;
 public final class UpgradeManager {
 
     private static final String TITLE = "Upgrades & Traps";
-    private static final int SIZE = 27;
+    private static final int SIZE = 54;
 
-    private static final int SLOT_SHARPNESS = 0;
-    private static final int SLOT_PROTECTION = 1;
-    private static final int SLOT_HASTE = 2;
-    private static final int SLOT_FORGE = 3;
-    private static final int SLOT_HEAL_POOL = 4;
-    private static final int SLOT_DRAGON_BUFF = 5;
-    private static final int SLOT_TRAP_1 = 6;
-    private static final int SLOT_TRAP_2 = 7;
-    private static final int SLOT_TRAP_3 = 8;
-    private static final int SLOT_TRAP_4 = 9;
-    private static final int SLOT_ACTIVE_TRAP_1 = 18;
-    private static final int SLOT_ACTIVE_TRAP_2 = 19;
-    private static final int SLOT_ACTIVE_TRAP_3 = 20;
+    // Layout uses a 6x9 inventory:
+    // - Row 1 and 6: completely empty.
+    // - Columns 1 and 9: completely empty.
+    // - Row 4, columns 2–8: gray divider panes with lore (↑ Upgrades / ↓ Traps).
+    // - Upgrades: rows 2–3, columns 2–4 (6 slots).
+    // - Traps to buy: rows 2–3, columns 6–8 (we use four of these slots).
+    // - Active trap queue: row 5, columns 4–6 (3 slots), stack size 1/2/3.
+
+    // Upgrades (row2/3, cols2–4).
+    public static final int SLOT_SHARPNESS = 10;   // row2, col2
+    public static final int SLOT_PROTECTION = 11;  // row2, col3
+    public static final int SLOT_HASTE = 12;       // row2, col4
+    public static final int SLOT_FORGE = 19;       // row3, col2
+    public static final int SLOT_HEAL_POOL = 20;   // row3, col3
+    public static final int SLOT_DRAGON_BUFF = 21; // row3, col4
+
+    // Trap purchase slots (rows2–3, cols6–8). Only 4 traps, remaining slots stay empty.
+    public static final int SLOT_TRAP_1 = 14; // row2, col6
+    public static final int SLOT_TRAP_2 = 15; // row2, col7
+    public static final int SLOT_TRAP_3 = 16; // row2, col8
+    public static final int SLOT_TRAP_4 = 23; // row3, col6
+
+    // Active trap queue display (row5, cols4–6).
+    public static final int SLOT_ACTIVE_TRAP_1 = 39; // row5, col4
+    public static final int SLOT_ACTIVE_TRAP_2 = 40; // row5, col5
+    public static final int SLOT_ACTIVE_TRAP_3 = 41; // row5, col6
 
     public void openGui(final Player player, final Arena arena, final ITeam team) {
         final TeamUpgradeState state = arena.getTeamUpgradeState(team);
@@ -62,24 +75,16 @@ public final class UpgradeManager {
         inv.setItem(SLOT_TRAP_3, iconTrap(TrapType.ALARM, state));
         inv.setItem(SLOT_TRAP_4, iconTrap(TrapType.MINER_FATIGUE, state));
 
-        // Active traps (slots 18-20)
+        // Active traps (row5, center 3 slots)
         final List<TrapType> queue = state.getTrapQueue();
         inv.setItem(SLOT_ACTIVE_TRAP_1, glassForTrap(queue.size() > 0 ? queue.get(0) : null, 1));
         inv.setItem(SLOT_ACTIVE_TRAP_2, glassForTrap(queue.size() > 1 ? queue.get(1) : null, 2));
         inv.setItem(SLOT_ACTIVE_TRAP_3, glassForTrap(queue.size() > 2 ? queue.get(2) : null, 3));
 
-        // Fill empty slots with barrier or gray glass so only our slots are clickable
-        final ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        final ItemMeta fillerMeta = filler.getItemMeta();
-        if (fillerMeta != null) {
-            fillerMeta.setDisplayName(" ");
-        }
-        filler.setItemMeta(fillerMeta);
-        for (int i = 10; i <= 17; i++) {
-            inv.setItem(i, filler);
-        }
-        for (int i = 21; i < SIZE; i++) {
-            inv.setItem(i, filler);
+        // Divider row (row4, columns 2–8) with lore ↑ Upgrades / ↓ Traps.
+        for (int col = 2; col <= 8; col++) {
+            final int slot = (3 * 9) + (col - 1); // row4 index = 3 (0-based)
+            inv.setItem(slot, dividerPane());
         }
 
         player.openInventory(inv);
@@ -239,7 +244,8 @@ public final class UpgradeManager {
     }
 
     private static ItemStack glassForTrap(final TrapType trap, final int slotNumber) {
-        final ItemStack stack = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        final Material material = trap != null ? trap.getIcon() : Material.LIGHT_GRAY_STAINED_GLASS;
+        final ItemStack stack = new ItemStack(material, slotNumber);
         final ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (trap != null) {
@@ -260,6 +266,20 @@ public final class UpgradeManager {
             }
         }
         stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private static ItemStack dividerPane() {
+        final ItemStack stack = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        final ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(" ");
+            meta.setLore(List.of(
+                    ChatColor.DARK_PURPLE + "↑ Upgrades",
+                    ChatColor.DARK_PURPLE + "↓ Traps"
+            ));
+            stack.setItemMeta(meta);
+        }
         return stack;
     }
 

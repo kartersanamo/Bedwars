@@ -34,7 +34,7 @@ public final class LobbyReturnListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(final PlayerInteractEvent event) {
         final Action action = event.getAction();
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {

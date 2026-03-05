@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public final class GameModeGuiListener implements Listener {
@@ -26,31 +27,24 @@ public final class GameModeGuiListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(final InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        if (!event.getView().getTitle().equals(GameModeGui.TITLE)) {
-            return;
-        }
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!event.getView().getTitle().equals(GameModeGui.TITLE)) return;
 
         event.setCancelled(true);
 
         final ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType() == Material.AIR) {
-            return;
-        }
+        if (clicked == null || clicked.getType() == Material.AIR) return;
 
         final EGameMode mode = modeFromItem(clicked);
-        if (mode == null) {
-            return;
-        }
+        if (mode == null) return;
 
         if (event.getClick() == ClickType.RIGHT) {
             player.sendMessage(ChatColor.AQUA + "Map selection is not implemented yet.");
             return;
         }
 
-        // Left-click: join appropriate arena for this mode.
+        // Left-click: join the appropriate arena for this mode.
+        // Ensure they aren't already in a game
         final IArena currentArena = plugin.getArenaManager().getArena(player);
         if (currentArena != null) {
             player.sendMessage(ChatColor.RED + "You are already in a Bedwars arena. Use /bedwars leave first.");
@@ -71,10 +65,9 @@ public final class GameModeGuiListener implements Listener {
 
         plugin.getArenaManager().playerJoinedArena(player, arena);
 
-        // Give waiting-lobby \"Return to Lobby\" item.
+        // Give the waiting-lobby "Return to Lobby" item.
         LobbyReturnItem.giveTo(player);
 
-        // Team assignment happens when the game starts (countdown reaches zero).
         player.teleport(arena.getLobbySpawn());
         final int current = arena.getPlayers().size();
         final int max = arena.getMaxPlayers();
@@ -89,24 +82,23 @@ public final class GameModeGuiListener implements Listener {
     }
 
     private Optional<IArena> findBestArenaForMode(final EGameMode mode) {
+        // Store the current "best" arena
         IArena bestWaiting = null;
         int bestWaitingPlayers = -1;
 
         IArena emptyLobby = null;
 
+        // Loop over every arena to find the best one
         for (IArena arena : plugin.getArenaManager().getArenas()) {
-            if (!arena.isEnabled()) {
-                continue;
-            }
-            if (arena.getTeamSize() != mode.getTeamSize()) {
-                continue;
-            }
+            if (!arena.isEnabled()) continue;
+            if (arena.getTeamSize() != mode.getTeamSize()) continue;
 
             final EGameState state = arena.getGameState();
             final int size = arena.getPlayers().size();
 
             if ((state == EGameState.LOBBY_WAITING || state == EGameState.STARTING)
                     && size > 0 && size < arena.getMaxPlayers()) {
+                // New best arena
                 if (size > bestWaitingPlayers) {
                     bestWaitingPlayers = size;
                     bestWaiting = arena;
@@ -125,9 +117,7 @@ public final class GameModeGuiListener implements Listener {
     }
 
     private EGameMode modeFromItem(final ItemStack item) {
-        if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
-            return null;
-        }
+        if (!item.hasItemMeta() || !Objects.requireNonNull(item.getItemMeta()).hasDisplayName()) return null;
         final String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
         for (EGameMode mode : EGameMode.values()) {
             if (mode.getDisplayName().equalsIgnoreCase(name)) {

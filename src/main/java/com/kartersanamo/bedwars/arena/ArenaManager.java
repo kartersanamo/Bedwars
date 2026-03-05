@@ -1,5 +1,6 @@
 package com.kartersanamo.bedwars.arena;
 
+import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.configuration.ArenaConfig;
@@ -11,6 +12,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Chest;
 import org.bukkit.WorldCreator;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
@@ -145,6 +149,17 @@ public final class ArenaManager {
                 if (shopNpcLocation != null && shopNpcLocation.getWorld() != null) {
                     final Location npcLoc = new Location(world, shopNpcLocation.getX(), shopNpcLocation.getY(),
                             shopNpcLocation.getZ(), shopNpcLocation.getYaw(), shopNpcLocation.getPitch());
+
+                    // Clean up any old armor stand holograms named "Item Shop" from templates or previous versions.
+                    for (ArmorStand existing : world.getEntitiesByClass(ArmorStand.class)) {
+                        if (existing.getLocation().distanceSquared(npcLoc) <= 4.0D) {
+                            final String name = existing.getCustomName();
+                            if (name != null && ChatColor.stripColor(name).equalsIgnoreCase("Item Shop")) {
+                                existing.remove();
+                            }
+                        }
+                    }
+
                     world.spawn(npcLoc, Villager.class, villager -> {
                         villager.setAI(false);
                         villager.setCollidable(false);
@@ -225,6 +240,14 @@ public final class ArenaManager {
                         null,
                         generatorItemTracker
                 ));
+            }
+
+            // Pre-create "PUNCH TO / DEPOSIT" holograms above all chests and ender chests
+            // inside this arena's regions so players see them without needing to punch first.
+            if (plugin instanceof Bedwars bw) {
+                final var hm = bw.getHologramManager();
+                config.getArenaRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
+                config.getLobbyRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
             }
 
             arenasById.put(arena.getId().toLowerCase(Locale.ROOT), arena);
@@ -314,19 +337,55 @@ public final class ArenaManager {
             return null;
         }
 
-        // Only copy if the instance folder does not already exist (e.g. after server restart).
-        if (!Files.isDirectory(instancePath)) {
-            try {
-                copyWorldFolder(templatePath, instancePath);
-            } catch (IOException ex) {
-                logger.severe("Failed to copy world '" + templateName + "' for arena '" + config.getId() + "': " + ex.getMessage());
-                return null;
+        // Always ensure the arena instance starts from a clean copy of the template
+        // on each server startup. If an old instance folder exists (from a previous
+        // run or crash), delete it and recreate from the template so lobbies and
+        // islands are never left in a modified state.
+        try {
+            if (Files.isDirectory(instancePath)) {
+                deleteWorldFolder(instancePath);
             }
+            copyWorldFolder(templatePath, instancePath);
+        } catch (IOException ex) {
+            logger.severe("Failed to prepare world '" + templateName + "' for arena '" + config.getId() + "': " + ex.getMessage());
+            return null;
         }
 
         final WorldCreator creator = new WorldCreator(instanceName);
         creator.environment(Objects.requireNonNullElse(Bukkit.getWorld(templateName), Bukkit.getWorlds().get(0)).getEnvironment());
         return Bukkit.createWorld(creator);
+    }
+
+    private void spawnDepositHologramsInRegion(final World world,
+                                               final ArenaConfig.Region region,
+                                               final com.kartersanamo.bedwars.hologram.HologramManager hologramManager) {
+        if (world == null || region == null || hologramManager == null) {
+            return;
+        }
+        final Location pos1 = region.getPos1();
+        final Location pos2 = region.getPos2();
+        if (pos1 == null || pos2 == null) {
+            return;
+        }
+
+        final int minX = Math.min(pos1.getBlockX(), pos2.getBlockX());
+        final int maxX = Math.max(pos1.getBlockX(), pos2.getBlockX());
+        final int minY = Math.min(pos1.getBlockY(), pos2.getBlockY());
+        final int maxY = Math.max(pos1.getBlockY(), pos2.getBlockY());
+        final int minZ = Math.min(pos1.getBlockZ(), pos2.getBlockZ());
+        final int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    final Block block = world.getBlockAt(x, y, z);
+                    final BlockState state = block.getState();
+                    if (state instanceof Chest || block.getType() == org.bukkit.Material.ENDER_CHEST) {
+                        hologramManager.ensureDepositHologram(block.getLocation());
+                    }
+                }
+            }
+        }
     }
 
     private void copyWorldFolder(final Path source, final Path target) throws IOException {
@@ -351,5 +410,21 @@ public final class ArenaManager {
                 throw new RuntimeException(ex);
             }
         });
+    }
+
+    private void deleteWorldFolder(final Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        // Delete children first, then the directory itself.
+        Files.walk(path)
+                .sorted(Comparator.reverseOrder())
+                .forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                });
     }
 }

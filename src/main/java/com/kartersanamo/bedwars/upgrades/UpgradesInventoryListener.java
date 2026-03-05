@@ -40,33 +40,29 @@ public final class UpgradesInventoryListener implements Listener {
         }
 
         final int slot = event.getRawSlot();
-        if (slot < 0 || slot >= 27) {
-            return;
-        }
-
-        // Active trap slots (18-20) are display-only
-        if (slot >= 18 && slot <= 20) {
-            return;
-        }
-
-        // Filler slots (10-17, 21-26) - no action
-        if ((slot >= 10 && slot <= 17) || slot >= 21) {
+        if (slot < 0 || slot >= 54) {
             return;
         }
 
         final int diamonds = countDiamonds(player);
 
-        switch (slot) { // slot 0-5 upgrades, 6-9 traps
-            case 0 -> tryBuySharpness(player, state, diamonds, arena, team);
-            case 1 -> tryBuyProtection(player, state, diamonds, arena, team);
-            case 2 -> tryBuyHaste(player, state, diamonds, arena, team);
-            case 3 -> tryBuyForge(player, state, diamonds, arena, team);
-            case 4 -> tryBuyHealPool(player, state, diamonds, arena, team);
-            case 5 -> tryBuyDragonBuff(player, state, diamonds, arena, team);
-            case 6 -> tryBuyTrap(player, state, diamonds, TrapType.ITS_A_TRAP, arena, team);
-            case 7 -> tryBuyTrap(player, state, diamonds, TrapType.COUNTER_OFFENSIVE, arena, team);
-            case 8 -> tryBuyTrap(player, state, diamonds, TrapType.ALARM, arena, team);
-            case 9 -> tryBuyTrap(player, state, diamonds, TrapType.MINER_FATIGUE, arena, team);
+        // First/last rows and columns, divider row, and trap queue row are all non-interactive.
+        // Only specific upgrade/trap slots are clickable.
+        switch (slot) {
+            case UpgradeManager.SLOT_SHARPNESS -> tryBuySharpness(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_PROTECTION -> tryBuyProtection(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_HASTE -> tryBuyHaste(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_FORGE -> tryBuyForge(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_HEAL_POOL -> tryBuyHealPool(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_DRAGON_BUFF -> tryBuyDragonBuff(player, state, diamonds, arena, team);
+            case UpgradeManager.SLOT_TRAP_1 ->
+                    tryBuyTrap(player, state, diamonds, TrapType.ITS_A_TRAP, arena, team);
+            case UpgradeManager.SLOT_TRAP_2 ->
+                    tryBuyTrap(player, state, diamonds, TrapType.COUNTER_OFFENSIVE, arena, team);
+            case UpgradeManager.SLOT_TRAP_3 ->
+                    tryBuyTrap(player, state, diamonds, TrapType.ALARM, arena, team);
+            case UpgradeManager.SLOT_TRAP_4 ->
+                    tryBuyTrap(player, state, diamonds, TrapType.MINER_FATIGUE, arena, team);
             default -> { }
         }
     }

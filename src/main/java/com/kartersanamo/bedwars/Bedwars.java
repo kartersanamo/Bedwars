@@ -5,13 +5,28 @@ import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.configuration.ConfigManager;
 import com.kartersanamo.bedwars.arena.ArenaManager;
 import com.kartersanamo.bedwars.arena.GeneratorItemTracker;
+import com.kartersanamo.bedwars.arena.tasks.OneTickGenerators;
+import com.kartersanamo.bedwars.arena.tasks.UpgradesApplyTask;
+import com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.SoundsConfig;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.database.SQLite;
+import com.kartersanamo.bedwars.gui.GameModeGuiListener;
+import com.kartersanamo.bedwars.hologram.HologramManager;
+import com.kartersanamo.bedwars.listeners.*;
 import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
+import com.kartersanamo.bedwars.lobby.LobbyReturnListener;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import com.kartersanamo.bedwars.shop.ShopManager;
+import com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener;
+import com.kartersanamo.bedwars.shop.listeners.ShopOpenListener;
+import com.kartersanamo.bedwars.sidebar.SidebarListener;
+import com.kartersanamo.bedwars.sidebar.SidebarService;
+import com.kartersanamo.bedwars.sidebar.SidebarUpdateTask;
+import com.kartersanamo.bedwars.upgrades.UpgradeManager;
+import com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -34,10 +49,10 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private ArenaManager arenaManager;
     private GeneratorItemTracker generatorItemTracker;
     private InternalAdapter internalAdapter;
-    private com.kartersanamo.bedwars.shop.ShopManager shopManager;
-    private com.kartersanamo.bedwars.upgrades.UpgradeManager upgradeManager;
-    private com.kartersanamo.bedwars.sidebar.SidebarService sidebarService;
-    private com.kartersanamo.bedwars.hologram.HologramManager hologramManager;
+    private ShopManager shopManager;
+    private UpgradeManager upgradeManager;
+    private SidebarService sidebarService;
+    private HologramManager hologramManager;
 
     @Override
     public void onEnable() {
@@ -60,41 +75,37 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         initialiseDatabase();
         initialiseArenas();
 
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.BlockPlaceListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.BlockBreakListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.MoveListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DeathListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.DamageListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.ChatListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopOpenListener(this, shopManager, upgradeManager), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener(this, shopManager), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener(upgradeManager), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.sidebar.SidebarListener(sidebarService), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.lobby.LobbyReturnListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.gui.GameModeGuiListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.SwordAndArmorEnforcementListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.ChestDepositListener(this), this);
-        getServer().getPluginManager().registerEvents(new com.kartersanamo.bedwars.listeners.HungerListener(this), this);
+        getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
+        getServer().getPluginManager().registerEvents(new BlockBreakListener(this), this);
+        getServer().getPluginManager().registerEvents(new MoveListener(this), this);
+        getServer().getPluginManager().registerEvents(new DeathListener(this), this);
+        getServer().getPluginManager().registerEvents(new DamageListener(this), this);
+        getServer().getPluginManager().registerEvents(new ChatListener(this), this);
+        getServer().getPluginManager().registerEvents(new ShopOpenListener(this, shopManager, upgradeManager), this);
+        getServer().getPluginManager().registerEvents(new ShopInventoryListener(this, shopManager), this);
+        getServer().getPluginManager().registerEvents(new UpgradesInventoryListener(upgradeManager), this);
+        getServer().getPluginManager().registerEvents(new SidebarListener(sidebarService), this);
+        getServer().getPluginManager().registerEvents(new LobbyReturnListener(this), this);
+        getServer().getPluginManager().registerEvents(new GameModeGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new SwordAndArmorEnforcementListener(this), this);
+        getServer().getPluginManager().registerEvents(new ChestDepositListener(this), this);
+        getServer().getPluginManager().registerEvents(new HungerListener(this), this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
-        final com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand bedwarsCommand =
-                new com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand();
+        final BedwarsCommand bedwarsCommand = new BedwarsCommand();
         Objects.requireNonNull(getCommand("bedwars"), "bedwars command not defined in plugin.yml")
                 .setExecutor(bedwarsCommand::onCommand);
         Objects.requireNonNull(getCommand("bedwars"), "bedwars command not defined in plugin.yml")
                 .setTabCompleter(bedwarsCommand::onTabComplete);
 
         // Start global generator ticking task.
-        new com.kartersanamo.bedwars.arena.tasks.OneTickGenerators(this)
-                .runTaskTimer(this, 1L, 1L);
+        new OneTickGenerators(this).runTaskTimer(this, 1L, 1L);
 
-        // Start sidebar refresh task (once per second).
-        new com.kartersanamo.bedwars.sidebar.SidebarUpdateTask(this, sidebarService)
-                .runTaskTimer(this, 20L, 20L);
+        // Start the sidebar refresh task (once per second).
+        new SidebarUpdateTask(this, sidebarService).runTaskTimer(this, 20L, 20L);
 
         // Apply Haste and Heal Pool every 2 seconds.
-        new com.kartersanamo.bedwars.arena.tasks.UpgradesApplyTask(this, arenaManager)
-                .runTaskTimer(this, 40L, 40L);
+        new UpgradesApplyTask(this, arenaManager).runTaskTimer(this, 40L, 40L);
 
         // Clean up generator item tracker for merged/despawned items (every 5 seconds).
         new org.bukkit.scheduler.BukkitRunnable() {
@@ -110,7 +121,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     @Override
     public void onDisable() {
-        // Cleanly end all active games and restore maps so next startup is fresh.
+        // Cleanly end all active games and restore maps so the next startup is fresh.
         if (arenaManager != null && internalAdapter != null) {
             final Location lobbySpawn = mainConfig != null ? mainConfig.getLobbySpawn() : null;
             for (IArena arena : arenaManager.getArenas()) {
@@ -118,31 +129,10 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
                 final Collection<Player> players = new ArrayList<>(arena.getPlayers());
                 final Collection<Player> spectators = new ArrayList<>(arena.getSpectators());
 
-                for (Player p : players) {
-                    if (lobbySpawn != null) {
-                        p.teleport(lobbySpawn);
-                    }
-                    arena.removePlayer(p, false);
-                    arenaManager.playerLeftArena(p);
-                    if (sidebarService != null) {
-                        sidebarService.removeSidebar(p);
-                    }
-                    LobbyReturnItem.removeFrom(p);
-                }
+                handlePlayers(lobbySpawn, arena, players);
+                handlePlayers(lobbySpawn, arena, spectators);
 
-                for (Player p : spectators) {
-                    if (lobbySpawn != null) {
-                        p.teleport(lobbySpawn);
-                    }
-                    arena.removePlayer(p, false);
-                    arenaManager.playerLeftArena(p);
-                    if (sidebarService != null) {
-                        sidebarService.removeSidebar(p);
-                    }
-                    LobbyReturnItem.removeFrom(p);
-                }
-
-                // Restore arena blocks back to their template state and reset internal state.
+                // Restore arena blocks back to their template state and reset the internal state.
                 internalAdapter.restoreArena(arena);
                 arena.resetAfterGame();
             }
@@ -159,9 +149,23 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         instance = null;
     }
 
+    private void handlePlayers(Location lobbySpawn, IArena arena, Collection<Player> players) {
+        for (Player p : players) {
+            if (lobbySpawn != null) {
+                p.teleport(lobbySpawn);
+            }
+            arena.removePlayer(p, false);
+            arenaManager.playerLeftArena(p);
+            if (sidebarService != null) {
+                sidebarService.removeSidebar(p);
+            }
+            LobbyReturnItem.removeFrom(p);
+        }
+    }
+
     private void initialiseDatabase() {
         if (!"sqlite".equalsIgnoreCase(mainConfig.getDatabaseType())) {
-            getLogger().warning("Only SQLite is supported in the MVP. Falling back to SQLite.");
+            getLogger().warning("Only SQLite is supported in this version. Falling back to SQLite.");
         }
 
         this.database = new SQLite(this, mainConfig.getSqliteFileName());
@@ -225,11 +229,11 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     }
 
     @Override
-    public com.kartersanamo.bedwars.sidebar.SidebarService getSidebarService() {
+    public SidebarService getSidebarService() {
         return sidebarService;
     }
 
-    public com.kartersanamo.bedwars.hologram.HologramManager getHologramManager() {
+    public HologramManager getHologramManager() {
         return hologramManager;
     }
 }

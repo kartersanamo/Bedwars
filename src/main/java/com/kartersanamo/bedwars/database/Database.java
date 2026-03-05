@@ -52,9 +52,7 @@ public abstract class Database {
      * Gracefully closes the database connection.
      */
     public void disconnect() {
-        if (connection == null) {
-            return;
-        }
+        if (connection == null) return;
 
         try {
             connection.close();

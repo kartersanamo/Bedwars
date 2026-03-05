@@ -60,7 +60,9 @@ public final class BlockPlaceListener implements Listener {
             }
         }
 
+        // Disallow placing blocks outside the configured arena-region for this arena.
         if (!concreteArena.isInsideRegion(location)) {
+            event.setCancelled(true);
             return;
         }
 

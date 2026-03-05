@@ -21,7 +21,14 @@ import org.bukkit.inventory.ItemStack;
  */
 public final class ShopInventoryListener implements Listener {
 
-    private static final int CONTENT_START = 9;
+    private static final int NAV_ROW_END = 8;
+
+    // Must match ShopManager.CONTENT_SLOTS.
+    private static final int[] CONTENT_SLOTS = {
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
+            37, 38, 39, 40, 41, 42, 43
+    };
 
     private final Bedwars plugin;
     private final ShopManager shopManager;
@@ -49,12 +56,24 @@ public final class ShopInventoryListener implements Listener {
             return;
         }
 
-        if (rawSlot < CONTENT_START) {
+        // Category row (top row).
+        if (rawSlot <= NAV_ROW_END) {
             handleCategoryRowClick(player, rawSlot);
             return;
         }
 
-        final int contentIndex = rawSlot - CONTENT_START;
+        // Content area: only specific slots are valid; divider panes and borders are ignored.
+        int contentIndex = -1;
+        for (int i = 0; i < CONTENT_SLOTS.length; i++) {
+            if (CONTENT_SLOTS[i] == rawSlot) {
+                contentIndex = i;
+                break;
+            }
+        }
+        if (contentIndex == -1) {
+            return;
+        }
+
         final IContentTier tier = holder.getTierAtContentIndex(contentIndex);
         if (tier == null) {
             return;

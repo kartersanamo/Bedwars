@@ -10,6 +10,7 @@ import com.kartersanamo.bedwars.commands.bedwars.subcommands.StopSubCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.ListSubCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.GUISubCommand;
 import com.kartersanamo.bedwars.commands.bedwars.subcommands.CancelSubCommand;
+import com.kartersanamo.bedwars.gui.GameModeGui;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 
@@ -38,7 +39,7 @@ public final class BedwarsCommand implements IParentCommand {
     public boolean onCommand(final CommandSender sender, final Command command, final String label, final String[] args) {
         if (args.length == 0) {
             if (sender instanceof org.bukkit.entity.Player player) {
-                com.kartersanamo.bedwars.gui.GameModeGui.openFor(player);
+                GameModeGui.openFor(player);
             } else {
                 sender.sendMessage("Usage: /" + label + " <join|leave|start|stop|cancel|list|gui>");
             }

@@ -22,8 +22,21 @@ import java.util.*;
  */
 public final class ShopManager {
 
-    private static final int CONTENT_START = 9;
-    private static final int CONTENT_SLOTS = 45;
+    /**
+     * Logical content indices (0-based) map to these inventory slots.
+     * Layout:
+     * - Row 0 (0–8): category icons
+     * - Row 1 (9–17): divider panes (lime + gray)
+     * - Rows 2–4 (18–44): item slots, but not first/last column
+     *   => valid content slots are:
+     *      row2: 19–25, row3: 28–34, row4: 37–43
+     * - Row 5 (45–53): empty
+     */
+    private static final int[] CONTENT_SLOTS = {
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
+            37, 38, 39, 40, 41, 42, 43
+    };
 
     /** Nav order: slot 0 = Quick Buy, 1 = Blocks, 2 = Melee, 3 = Armor, 4 = Tools, 5 = Ranged, 6 = Potions, 7 = Utility, 8 = Rotating Items. */
     private static final String[] NAV_ORDER = {
@@ -160,11 +173,20 @@ public final class ShopManager {
         final Inventory inv = Bukkit.createInventory(holder, 54, title);
         holder.setInventory(inv);
 
+        // Top row: category icons (Quick Buy, Blocks, Melee, Armor, Tools, Ranged, Potions, Utility, Rotating).
         for (int i = 0; i < NAV_ORDER.length; i++) {
             inv.setItem(i, navItemForSlot(i));
         }
-        for (int i = 0; i < contentTiers.size() && i < CONTENT_SLOTS; i++) {
-            inv.setItem(CONTENT_START + i, displayItem(contentTiers.get(i), arena));
+
+        // Second row: divider panes (lime under Quick Buy, then gray).
+        inv.setItem(9, dividerPane(true));
+        for (int slot = 10; slot <= 17; slot++) {
+            inv.setItem(slot, dividerPane(false));
+        }
+
+        // Rows 3–5: content items in mapped slots (no items in first/last column).
+        for (int i = 0; i < contentTiers.size() && i < CONTENT_SLOTS.length; i++) {
+            inv.setItem(CONTENT_SLOTS[i], displayItem(contentTiers.get(i), arena, player));
         }
         player.openInventory(inv);
     }
@@ -200,18 +222,41 @@ public final class ShopManager {
         return icon;
     }
 
-    private ItemStack displayItem(final IContentTier tier, final IArena arena) {
+    /**
+     * Builds the display item for a shop tier for a specific viewer.
+     *
+     * - Name is red when the player cannot currently buy it (not enough currency
+     *   or blocked by upgrade rules), and green when it is purchasable now.
+     * - Lore always shows cost and quick-buy hint, plus a third line indicating
+     *   whether the player can afford it.
+     */
+    private ItemStack displayItem(final IContentTier tier, final IArena arena, final Player viewer) {
         final ItemStack item = tier.getItem().clone();
         final ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             final int cost = tier.getCostFor(arena);
             final String currencyName = formatCurrency(tier.getCurrency());
+            int total = 0;
+            for (ItemStack stack : viewer.getInventory().getContents()) {
+                if (stack != null && stack.getType() == tier.getCurrency()) {
+                    total += stack.getAmount();
+                }
+            }
+            final boolean hasEnough = total >= cost;
+            final boolean canPurchaseNow = hasEnough && tier.canPurchase(viewer, arena);
+
             final List<String> lore = new ArrayList<>();
             lore.add(ChatColor.WHITE + "Cost: " + cost + " " + currencyName);
             lore.add(ChatColor.AQUA + "Shift Click to add to Quick Buy");
+            if (hasEnough) {
+                lore.add(ChatColor.GREEN + "Click to purchase!");
+            } else {
+                lore.add(ChatColor.RED + "You don't have enough " + currencyName + "!");
+            }
             meta.setLore(lore);
             if (meta.hasDisplayName()) {
-                meta.setDisplayName(ChatColor.RED + ChatColor.stripColor(meta.getDisplayName()));
+                final String baseName = ChatColor.stripColor(meta.getDisplayName());
+                meta.setDisplayName((canPurchaseNow ? ChatColor.GREEN : ChatColor.RED) + baseName);
             }
             item.setItemMeta(meta);
         }
@@ -234,6 +279,20 @@ public final class ShopManager {
             list.addAll(content.getTiers());
         }
         return list;
+    }
+
+    private static ItemStack dividerPane(final boolean primary) {
+        final ItemStack stack = new ItemStack(primary ? Material.LIME_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE);
+        final ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(" ");
+            meta.setLore(List.of(
+                    ChatColor.DARK_PURPLE + "↑ Categories",
+                    ChatColor.DARK_PURPLE + "↓ Items"
+            ));
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     /**

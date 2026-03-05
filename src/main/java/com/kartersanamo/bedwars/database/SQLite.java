@@ -20,9 +20,7 @@ public final class SQLite extends Database {
 
     @Override
     public void connect() throws SQLException {
-        if (isConnected()) {
-            return;
-        }
+        if (isConnected()) return;
 
         try {
             Class.forName("org.sqlite.JDBC");

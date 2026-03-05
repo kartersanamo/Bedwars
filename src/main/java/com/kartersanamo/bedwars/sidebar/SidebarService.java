@@ -199,7 +199,7 @@ public final class SidebarService implements ISidebarManager {
 
         // Blank spacer before server line.
         lines.add(blank(3));
-        lines.add(ChatColor.WHITE + "Server: " + ChatColor.YELLOW + arena.getId());
+        lines.add(ChatColor.WHITE + "Server: " + ChatColor.GREEN + arena.getId());
         lines.add(blank(4));
         lines.add(ChatColor.YELLOW + "play.kartersanamo.com");
         return lines;

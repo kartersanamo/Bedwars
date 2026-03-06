@@ -2,8 +2,8 @@ package com.kartersanamo.bedwars.shop.listeners;
 
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.api.arena.shop.IContentTier;
+import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.shop.ShopInventoryHolder;
 import com.kartersanamo.bedwars.shop.ShopManager;
 import org.bukkit.ChatColor;
@@ -14,6 +14,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.Objects;
 
 /**
  * Handles interactions in the 54-slot shop GUI: category row (0–8) switches view,
@@ -75,14 +77,24 @@ public final class ShopInventoryListener implements Listener {
         }
 
         final IContentTier tier = holder.getTierAtContentIndex(contentIndex);
-        if (tier == null) {
-            return;
-        }
-
         final IArena arena = plugin.getArenaManager().getArena(player);
         if (event.isShiftClick()) {
-            // TODO: add to Quick Buy
-        } else {
+            // Shift-click behavior:
+            // - In any category view: add clicked tier to player's Quick Buy row.
+            // - In Quick Buy view, last row (indices 14–20): toggle/remove that slot.
+            final String viewId = holder.getViewId();
+            if ("quick_buy".equalsIgnoreCase(viewId) && contentIndex >= 14) {
+                final int quickIndex = contentIndex - 14;
+                shopManager.clearQuickBuySlot(player, quickIndex);
+                shopManager.openView(player, "quick_buy", arena);
+            } else if (tier != null) {
+                shopManager.addToQuickBuy(player, tier);
+                // If currently looking at Quick Buy, refresh so the row updates immediately.
+                if ("quick_buy".equalsIgnoreCase(viewId)) {
+                    shopManager.openView(player, "quick_buy", arena);
+                }
+            }
+        } else if (tier != null) {
             tryPurchase(player, tier, arena);
         }
     }
@@ -139,7 +151,7 @@ public final class ShopInventoryListener implements Listener {
     }
 
     private static String formatItemName(final ItemStack item) {
-        if (item != null && item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+        if (item != null && item.hasItemMeta() && Objects.requireNonNull(item.getItemMeta()).hasDisplayName()) {
             return ChatColor.stripColor(item.getItemMeta().getDisplayName());
         }
         if (item != null && item.getType() != Material.AIR) {
@@ -165,11 +177,4 @@ public final class ShopInventoryListener implements Listener {
         return n.isEmpty() ? n : Character.toUpperCase(n.charAt(0)) + n.substring(1);
     }
 
-    private static String formatCurrency(final Material m) {
-        if (m == Material.IRON_INGOT) return "iron";
-        if (m == Material.GOLD_INGOT) return "gold";
-        if (m == Material.DIAMOND) return "diamonds";
-        if (m == Material.EMERALD) return "emeralds";
-        return m.name().toLowerCase();
-    }
 }

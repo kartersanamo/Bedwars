@@ -5,8 +5,10 @@ import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.configuration.ConfigManager;
 import com.kartersanamo.bedwars.arena.ArenaManager;
 import com.kartersanamo.bedwars.arena.GeneratorItemTracker;
+import com.kartersanamo.bedwars.arena.RejoinManager;
 import com.kartersanamo.bedwars.arena.tasks.OneTickGenerators;
 import com.kartersanamo.bedwars.arena.tasks.UpgradesApplyTask;
+import com.kartersanamo.bedwars.commands.RejoinCommand;
 import com.kartersanamo.bedwars.commands.bedwars.BedwarsCommand;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
@@ -48,6 +50,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private Database database;
     private ArenaManager arenaManager;
     private GeneratorItemTracker generatorItemTracker;
+    private RejoinManager rejoinManager;
     private InternalAdapter internalAdapter;
     private ShopManager shopManager;
     private UpgradeManager upgradeManager;
@@ -67,6 +70,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
         this.internalAdapter = new InternalAdapter();
         this.generatorItemTracker = new GeneratorItemTracker(this);
+        this.rejoinManager = new RejoinManager();
         this.shopManager = new com.kartersanamo.bedwars.shop.ShopManager();
         this.upgradeManager = new com.kartersanamo.bedwars.upgrades.UpgradeManager();
         this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
@@ -90,6 +94,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new SwordAndArmorEnforcementListener(this), this);
         getServer().getPluginManager().registerEvents(new ChestDepositListener(this), this);
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
+        getServer().getPluginManager().registerEvents(new RejoinListener(this), this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
         final BedwarsCommand bedwarsCommand = new BedwarsCommand();
@@ -97,6 +102,11 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
                 .setExecutor(bedwarsCommand::onCommand);
         Objects.requireNonNull(getCommand("bedwars"), "bedwars command not defined in plugin.yml")
                 .setTabCompleter(bedwarsCommand::onTabComplete);
+
+        // /rejoin command
+        if (getCommand("rejoin") != null) {
+            Objects.requireNonNull(getCommand("rejoin")).setExecutor(new RejoinCommand(this));
+        }
 
         // Start global generator ticking task.
         new OneTickGenerators(this).runTaskTimer(this, 1L, 1L);
@@ -235,5 +245,9 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     public HologramManager getHologramManager() {
         return hologramManager;
+    }
+
+    public RejoinManager getRejoinManager() {
+        return rejoinManager;
     }
 }

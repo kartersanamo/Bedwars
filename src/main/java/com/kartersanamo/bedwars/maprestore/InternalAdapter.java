@@ -9,15 +9,11 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 /**
  * In-memory arena restore adapter.
- *
+ * <p>
  * This implementation:
  * - takes an initial snapshot of all blocks in the configured arena region
  * - tracks which blocks were modified during gameplay
@@ -84,36 +80,38 @@ public final class InternalAdapter {
     }
 
     /**
-     * Restores all modified blocks in the arena region back to their snapshot state.
+     * Restores all blocks in the snapshotted arena region back to their original state.
      * Also removes all dropped items (Item entities) within the snapshot region.
+     * <p>
+     * Originally this adapter tried to restore only modified blocks, but that can
+     * miss changes from explosions or external plugins. For reliability we now
+     * restore the full snapshot each time, which is still fast enough for typical
+     * Bed Wars arenas.
      */
     public void restoreArena(final IArena arena) {
         final Map<BlockPosition, BlockData> snapshot = arenaSnapshots.get(arena.getId());
-        final Set<BlockPosition> modified = modifiedBlocks.get(arena.getId());
-
         final World world = arena.getWorld();
         if (world == null) {
             return;
         }
 
-        if (snapshot != null && !snapshot.isEmpty()) {
-            clearDroppedItemsInSnapshotBounds(world, snapshot.keySet());
-        }
-
-        if (snapshot == null || modified == null || modified.isEmpty()) {
+        if (snapshot == null || snapshot.isEmpty()) {
             return;
         }
 
-        for (BlockPosition position : modified) {
-            final BlockData data = snapshot.get(position);
-            if (data == null) {
-                continue;
-            }
+        clearDroppedItemsInSnapshotBounds(world, snapshot.keySet());
+
+        for (Map.Entry<BlockPosition, BlockData> entry : snapshot.entrySet()) {
+            final BlockPosition position = entry.getKey();
+            final BlockData data = entry.getValue();
             final Block block = world.getBlockAt(position.x(), position.y(), position.z());
             block.setBlockData(data, false);
         }
 
-        modified.clear();
+        final Set<BlockPosition> modified = modifiedBlocks.get(arena.getId());
+        if (modified != null) {
+            modified.clear();
+        }
     }
 
     private void clearDroppedItemsInSnapshotBounds(final World world, final Set<BlockPosition> positions) {

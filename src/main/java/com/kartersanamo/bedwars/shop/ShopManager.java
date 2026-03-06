@@ -45,6 +45,8 @@ public final class ShopManager {
 
     private final Map<String, ShopCategory> categories = new LinkedHashMap<>();
     private final List<IContentTier> defaultQuickBuyTiers = new ArrayList<>();
+    /** Per-player configurable Quick Buy row (last row in Quick Buy view, 7 slots). */
+    private final Map<UUID, IContentTier[]> playerQuickBuyRows = new HashMap<>();
 
     public ShopManager() {
         loadDefaultShop();
@@ -129,7 +131,7 @@ public final class ShopManager {
         final ShopCategory tools = getCategory("tools");
         final ShopCategory ranged = getCategory("ranged");
         final ShopCategory utility = getCategory("utility");
-        collectFirstTier(blocks, defaultQuickBuyTiers, 1);
+        collectFirstTier(blocks, defaultQuickBuyTiers);
         defaultQuickBuyTiers.add(getTierAtSlot(melee, 0));
         defaultQuickBuyTiers.add(getTierAtSlot(armor, 0));
         defaultQuickBuyTiers.add(getTierAtSlot(tools, 0));
@@ -141,8 +143,9 @@ public final class ShopManager {
         defaultQuickBuyTiers.removeIf(Objects::isNull);
     }
 
-    private static void collectFirstTier(final ShopCategory category, final List<IContentTier> out, final int maxPerContent) {
+    private static void collectFirstTier(final ShopCategory category, final List<IContentTier> out) {
         if (category == null) return;
+        final int maxPerContent = 1;
         for (CategoryContent content : category.getContents()) {
             int n = 0;
             for (IContentTier tier : content.getTiers()) {
@@ -161,13 +164,25 @@ public final class ShopManager {
     public void openView(final Player player, final String viewId, final IArena arena) {
         final String title = viewTitle(viewId);
         final ShopCategory category = "quick_buy".equals(viewId) ? null : getCategory(viewId);
-        final List<IContentTier> contentTiers;
+        final List<IContentTier> contentTiers = new ArrayList<>(CONTENT_SLOTS.length);
         if ("quick_buy".equals(viewId)) {
-            contentTiers = defaultQuickBuyTiers;
+            // First two content rows: default quick buy layout (static).
+            for (int i = 0; i < CONTENT_SLOTS.length; i++) {
+                if (i < defaultQuickBuyTiers.size()) {
+                    contentTiers.add(defaultQuickBuyTiers.get(i));
+                } else {
+                    contentTiers.add(null);
+                }
+            }
+            // Last row (indices 14–20) overridden by per-player Quick Buy row.
+            final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
+            for (int i = 0; i < row.length; i++) {
+                contentTiers.set(14 + i, row[i]);
+            }
         } else if ("tools".equals(viewId)) {
-            contentTiers = getToolsNextTiers(category, player, arena);
+            contentTiers.addAll(getToolsNextTiers(category, player, arena));
         } else {
-            contentTiers = getContentTiersList(category);
+            contentTiers.addAll(getContentTiersList(category));
         }
         final ShopInventoryHolderImpl holder = new ShopInventoryHolderImpl(viewId, category, contentTiers);
         final Inventory inv = Bukkit.createInventory(holder, 54, title);
@@ -185,8 +200,20 @@ public final class ShopManager {
         }
 
         // Rows 3–5: content items in mapped slots (no items in first/last column).
-        for (int i = 0; i < contentTiers.size() && i < CONTENT_SLOTS.length; i++) {
-            inv.setItem(CONTENT_SLOTS[i], displayItem(contentTiers.get(i), arena, player));
+        for (int i = 0; i < CONTENT_SLOTS.length && i < contentTiers.size(); i++) {
+            final IContentTier tier = contentTiers.get(i);
+            if ("quick_buy".equals(viewId) && i >= 14) {
+                // Last content row in Quick Buy: configurable Quick Buy bar.
+                if (tier != null) {
+                    inv.setItem(CONTENT_SLOTS[i], displayItem(tier, arena, player));
+                } else {
+                    inv.setItem(CONTENT_SLOTS[i], quickBuyEmptyPane());
+                }
+            } else {
+                if (tier != null) {
+                    inv.setItem(CONTENT_SLOTS[i], displayItem(tier, arena, player));
+                }
+            }
         }
         player.openInventory(inv);
     }
@@ -224,7 +251,7 @@ public final class ShopManager {
 
     /**
      * Builds the display item for a shop tier for a specific viewer.
-     *
+     * <p>
      * - Name is red when the player cannot currently buy it (not enough currency
      *   or blocked by upgrade rules), and green when it is purchasable now.
      * - Lore always shows cost and quick-buy hint, plus a third line indicating
@@ -281,6 +308,35 @@ public final class ShopManager {
         return list;
     }
 
+    private IContentTier[] getOrCreateQuickBuyRow(final UUID uuid) {
+        return playerQuickBuyRows.computeIfAbsent(uuid, u -> new IContentTier[7]);
+    }
+
+    /** Adds the given tier to the player's Quick Buy row (last row), in the first empty slot. */
+    public void addToQuickBuy(final Player player, final IContentTier tier) {
+        if (tier == null) return;
+        final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
+        // Avoid duplicates.
+        for (IContentTier existing : row) {
+            if (existing == tier) {
+                return;
+            }
+        }
+        for (int i = 0; i < row.length; i++) {
+            if (row[i] == null) {
+                row[i] = tier;
+                break;
+            }
+        }
+    }
+
+    /** Clears a specific Quick Buy slot (0–6) for the player. */
+    public void clearQuickBuySlot(final Player player, final int index) {
+        if (index < 0 || index >= 7) return;
+        final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
+        row[index] = null;
+    }
+
     private static ItemStack dividerPane(final boolean primary) {
         final ItemStack stack = new ItemStack(primary ? Material.LIME_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE);
         final ItemMeta meta = stack.getItemMeta();
@@ -289,6 +345,21 @@ public final class ShopManager {
             meta.setLore(List.of(
                     ChatColor.DARK_PURPLE + "↑ Categories",
                     ChatColor.DARK_PURPLE + "↓ Items"
+            ));
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    private static ItemStack quickBuyEmptyPane() {
+        final ItemStack stack = new ItemStack(Material.RED_STAINED_GLASS_PANE);
+        final ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.RED + "Empty slot!");
+            meta.setLore(List.of(
+                    ChatColor.GRAY + "This is a Quick Buy Slot!",
+                    ChatColor.GRAY + "Shift " + ChatColor.AQUA + "Click" + ChatColor.GRAY + " any item in the shop",
+                    ChatColor.GRAY + "to add it here."
             ));
             stack.setItemMeta(meta);
         }
@@ -321,16 +392,12 @@ public final class ShopManager {
                 // Shears or any other tools content: show the first tier (with canPurchase preventing re-buys).
                 final List<IContentTier> tiers = content.getTiers();
                 if (!tiers.isEmpty()) {
-                    result.add(tiers.get(0));
+                    result.add(tiers.getFirst());
                 }
             }
         }
 
         return result;
-    }
-
-    public Collection<ShopCategory> getCategories() {
-        return Collections.unmodifiableCollection(categories.values());
     }
 
     public ShopCategory getCategory(final String id) {

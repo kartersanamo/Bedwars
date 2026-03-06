@@ -4,7 +4,6 @@ import com.kartersanamo.bedwars.api.arena.shop.IContentTier;
 import com.kartersanamo.bedwars.shop.main.ShopCategory;
 import org.bukkit.inventory.Inventory;
 
-import java.util.Collections;
 import java.util.List;
 
 final class ShopInventoryHolderImpl implements ShopInventoryHolder {
@@ -17,7 +16,10 @@ final class ShopInventoryHolderImpl implements ShopInventoryHolder {
     ShopInventoryHolderImpl(final String viewId, final ShopCategory category, final List<IContentTier> contentTiers) {
         this.viewId = viewId;
         this.category = category;
-        this.contentTiers = contentTiers != null ? List.copyOf(contentTiers) : Collections.emptyList();
+        // Allow null entries so specific content slots can intentionally be empty
+        // (e.g., Quick Buy row placeholders). Copy into a mutable list to avoid
+        // callers depending on immutability.
+        this.contentTiers = contentTiers != null ? new java.util.ArrayList<>(contentTiers) : new java.util.ArrayList<>();
     }
 
     void setInventory(final Inventory inventory) {

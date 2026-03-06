@@ -18,6 +18,7 @@ import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.upgrades.TeamUpgradeState;
 import com.kartersanamo.bedwars.upgrades.TrapType;
 import org.bukkit.*;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Bed;
@@ -34,7 +35,7 @@ import java.util.*;
 
 /**
  * Concrete arena implementation.
- *
+ * <p>
  * A large part of the game logic is orchestrated by task classes in
  * {@code arena.tasks}, but the arena itself owns the high-level state and
  * participant tracking.
@@ -279,10 +280,6 @@ public final class Arena implements IArena {
         return spectatorSpawn;
     }
 
-    public Optional<ArenaConfig.Region> getRegion() {
-        return Optional.ofNullable(region);
-    }
-
     public Optional<ArenaConfig.Region> getLobbyRegion() {
         return Optional.ofNullable(lobbyRegion);
     }
@@ -340,7 +337,7 @@ public final class Arena implements IArena {
      * Returns whether the given location is inside the configured arena region.
      */
     public boolean isInsideRegion(final Location location) {
-        if (region == null || location == null || !location.getWorld().equals(world)) {
+        if (region == null || location == null || !Objects.equals(location.getWorld(), world)) {
             return false;
         }
 
@@ -397,11 +394,6 @@ public final class Arena implements IArena {
         playerHasShears.remove(uuid);
 
         getTeam(player).ifPresent(team -> team.removePlayer(player));
-
-        if (toLobby) {
-            // The global lobby spawn is outside the responsibility of the arena;
-            // the caller should handle teleportation appropriately.
-        }
     }
 
     @Override
@@ -702,12 +694,7 @@ public final class Arena implements IArena {
         if (padding == 0) {
             return message;
         }
-        final StringBuilder sb = new StringBuilder(padding + message.length());
-        for (int i = 0; i < padding; i++) {
-            sb.append(' ');
-        }
-        sb.append(message);
-        return sb.toString();
+        return " ".repeat(padding) + message;
     }
 
     private static final int RESPAWN_SPECTATOR_SECONDS = 3;
@@ -723,11 +710,10 @@ public final class Arena implements IArena {
 
         if (bedDestroyed) {
             player.sendMessage(ChatColor.RED + "You have been eliminated!");
-            final Optional<ITeam> eliminatedTeamOpt = teamOpt;
             players.remove(player.getUniqueId());
             spectators.add(player.getUniqueId());
-            if (eliminatedTeamOpt.isPresent()) {
-                final ITeam eliminatedTeam = eliminatedTeamOpt.get();
+            if (teamOpt.isPresent()) {
+                final ITeam eliminatedTeam = teamOpt.get();
                 eliminatedTeam.removePlayer(player);
                 boolean anyLeft = false;
                 for (UUID memberId : eliminatedTeam.getMemberIds()) {
@@ -814,7 +800,7 @@ public final class Arena implements IArena {
         final ITeam team = teamOpt.get();
         player.teleport(team.getSpawnLocation());
         player.setGameMode(GameMode.SURVIVAL);
-        player.setHealth(player.getMaxHealth());
+        player.setHealth(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue());
         player.setFoodLevel(20);
         player.getInventory().clear();
         giveRespawnKit(player);
@@ -1090,22 +1076,21 @@ public final class Arena implements IArena {
 
     @Override
     public void broadcastGameOverSummary(final ITeam winningTeam) {
-        final String separator = ChatColor.GREEN + "--------------------";
+        final String separator = ChatColor.GREEN + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
 
         for (Player p : getPlayers()) {
             if (winningTeam != null && winningTeam.getOnlineMembers().contains(p)) {
                 p.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!", "", 10, 70, 20);
             }
             p.sendMessage(separator);
-            p.sendMessage(ChatColor.WHITE + "Bed Wars");
-            p.sendMessage(separator);
+            p.sendMessage(centerChat(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars"));
+            p.sendMessage("");
             if (winningTeam != null) {
-                final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
                 final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
-                p.sendMessage(winningTeam.getColor().getChatColor() + colorName + ChatColor.WHITE + " - " + names);
+                p.sendMessage(centerChat(winningTeam.getColor().getChatColor() + "Winners" + ChatColor.GRAY + " - " + names));
             }
+            p.sendMessage("");
             sendKillerStats(p);
-            p.sendMessage(ChatColor.GREEN + "Thanks for playing!");
             p.sendMessage(separator);
         }
         for (Player p : getSpectators()) {
@@ -1118,7 +1103,7 @@ public final class Arena implements IArena {
                 p.sendMessage(winningTeam.getColor().getChatColor() + colorName + ChatColor.WHITE + " - " + names);
             }
             sendKillerStats(p);
-            p.sendMessage(ChatColor.GREEN + "Thanks for playing!");
+            p.sendMessage("");
             p.sendMessage(separator);
         }
     }
@@ -1134,7 +1119,7 @@ public final class Arena implements IArena {
             final Player p = all.get(i);
             final int count = killCountThisGame.getOrDefault(p.getUniqueId(), 0);
             final String rank = (i + 1) + (i == 0 ? "st" : i == 1 ? "nd" : "rd");
-            recipient.sendMessage(rankColors[i] + rank + " Killer - " + ChatColor.WHITE + p.getName() + " - " + count);
+            recipient.sendMessage(centerChat(rankColors[i] + "" + ChatColor.BOLD + rank + " Killer" + ChatColor.GRAY + " - " + p.getName() + " - " + count));
         }
     }
 
@@ -1144,7 +1129,7 @@ public final class Arena implements IArena {
         return playerArmorTier.getOrDefault(player.getUniqueId(), ArmorTier.LEATHER);
     }
 
-    /** Upgrades armor tier only if new tier is higher. Returns true if upgraded. */
+    /** Upgrades armor tier only if the new tier is higher. Returns true if upgraded. */
     public boolean setPlayerArmorTier(final Player player, final ArmorTier tier) {
         final ArmorTier current = getPlayerArmorTier(player);
         if (tier.ordinal() <= current.ordinal()) {
@@ -1236,13 +1221,7 @@ public final class Arena implements IArena {
         return false;
     }
 
-    private static boolean isPermanentArmor(final ItemStack stack) {
-        if (stack == null || stack.getType() == Material.AIR) return false;
-        return stack.getType().name().endsWith("_HELMET") || stack.getType().name().endsWith("_CHESTPLATE")
-                || stack.getType().name().endsWith("_LEGGINGS") || stack.getType().name().endsWith("_BOOTS");
-    }
-
-    /** Gives wooden sword and full leather armor (team-colored chest/helmet). Axe/pickaxe are shop-only. */
+    /** Gives a wooden sword and full leather armor (team-colored chest/helmet). Axe/pickaxe are shop-only. */
     private void giveStarterKit(final Player player) {
         final UUID uuid = player.getUniqueId();
         playerArmorTier.put(uuid, ArmorTier.LEATHER);
@@ -1372,7 +1351,7 @@ public final class Arena implements IArena {
                     player.getInventory().getLeggings(),
                     player.getInventory().getBoots()
             }) {
-                if (piece != null && !piece.getType().isAir() && piece.getType().getEquipmentSlot() != null) {
+                if (piece != null && !piece.getType().isAir()) {
                     piece.addUnsafeEnchantment(Enchantment.PROTECTION, prot);
                 }
             }

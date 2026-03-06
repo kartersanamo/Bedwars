@@ -1,21 +1,16 @@
 package com.kartersanamo.bedwars.arena;
 
 import com.kartersanamo.bedwars.Bedwars;
-import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
-import com.kartersanamo.bedwars.configuration.ArenaConfig;
-import com.kartersanamo.bedwars.configuration.MainConfig;
-import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
-import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.World;
+import com.kartersanamo.bedwars.configuration.ArenaConfig;
+import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
+import com.kartersanamo.bedwars.configuration.MainConfig;
+import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
-import org.bukkit.WorldCreator;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
@@ -43,10 +38,6 @@ public final class ArenaManager {
 
     private final Map<String, IArena> arenasById = new HashMap<>();
     private final Map<UUID, IArena> arenaByPlayer = new HashMap<>();
-
-    public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter) {
-        this(plugin, mainConfig, generatorsConfig, internalAdapter, null);
-    }
 
     public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter, final GeneratorItemTracker generatorItemTracker) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -195,8 +186,7 @@ public final class ArenaManager {
                         villager.setCollidable(false);
                         villager.setInvulnerable(true);
                         villager.setSilent(true);
-                        villager.setCustomNameVisible(true);
-                        villager.setCustomName(teamDef.getColor().getChatColor() + "Upgrades");
+                        villager.setCustomNameVisible(false);
                     });
                     final double ux = upgLoc.getX();
                     final double uy = upgLoc.getY();
@@ -206,14 +196,14 @@ public final class ArenaManager {
                         stand.setInvisible(true);
                         stand.setGravity(false);
                         stand.setCustomNameVisible(true);
-                        stand.setCustomName(ChatColor.GREEN + "UPGRADES");
+                        stand.setCustomName(ChatColor.AQUA + "UPGRADES");
                     });
                     world.spawn(new Location(world, ux, uy + 1.75, uz), ArmorStand.class, stand -> {
                         stand.setMarker(true);
                         stand.setInvisible(true);
                         stand.setGravity(false);
                         stand.setCustomNameVisible(true);
-                        stand.setCustomName(ChatColor.GOLD + "RIGHT CLICK");
+                        stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
                     });
                 }
             }
@@ -276,39 +266,8 @@ public final class ArenaManager {
     }
 
     /**
-     * Finds the best joinable arena for the given player.
-     *
-     * Preference is given to arenas that are already filling up but not yet full.
-     */
-    public Optional<IArena> findBestJoinableArena() {
-        IArena best = null;
-        int bestPlayerCount = -1;
-
-        for (IArena arena : arenasById.values()) {
-            if (!arena.isEnabled()) {
-                continue;
-            }
-            final EGameState state = arena.getGameState();
-            if (state != EGameState.LOBBY_WAITING && state != EGameState.STARTING) {
-                continue;
-            }
-            final int size = arena.getPlayers().size();
-            if (size >= arena.getMaxPlayers()) {
-                continue;
-            }
-
-            if (size > bestPlayerCount) {
-                bestPlayerCount = size;
-                best = arena;
-            }
-        }
-
-        return Optional.ofNullable(best);
-    }
-
-    /**
      * Creates or loads an isolated world instance for the given arena config.
-     *
+     * <p>
      * The template world is NEVER modified; instead we copy its folder once to
      * a new world folder and load that as the arena's active world. This allows
      * multiple arenas to share the same template map without cross-contamination.
@@ -352,7 +311,7 @@ public final class ArenaManager {
         }
 
         final WorldCreator creator = new WorldCreator(instanceName);
-        creator.environment(Objects.requireNonNullElse(Bukkit.getWorld(templateName), Bukkit.getWorlds().get(0)).getEnvironment());
+        creator.environment(Objects.requireNonNullElse(Bukkit.getWorld(templateName), Bukkit.getWorlds().getFirst()).getEnvironment());
         return Bukkit.createWorld(creator);
     }
 
@@ -388,6 +347,7 @@ public final class ArenaManager {
         }
     }
 
+    @SuppressWarnings("resource")
     private void copyWorldFolder(final Path source, final Path target) throws IOException {
         Files.walk(source).forEach(path -> {
             try {
@@ -412,6 +372,7 @@ public final class ArenaManager {
         });
     }
 
+    @SuppressWarnings("resource")
     private void deleteWorldFolder(final Path path) throws IOException {
         if (!Files.exists(path)) {
             return;

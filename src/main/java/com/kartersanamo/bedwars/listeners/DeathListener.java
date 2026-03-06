@@ -16,6 +16,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Handles player deaths inside arenas and delegates to arena logic.
@@ -126,7 +127,7 @@ public final class DeathListener implements Listener {
             final HashMap<Integer, ItemStack> overflow = killer.getInventory().addItem(stack);
             for (ItemStack remainder : overflow.values()) {
                 if (remainder != null && !remainder.getType().isAir()) {
-                    dropLocation.getWorld().dropItemNaturally(dropLocation, remainder);
+                    Objects.requireNonNull(dropLocation.getWorld()).dropItemNaturally(dropLocation, remainder);
                 }
             }
         }
@@ -160,7 +161,7 @@ public final class DeathListener implements Listener {
                     continue;
                 }
             }
-            killer.sendMessage(ChatColor.GOLD + "+" + amount + " " + nameColor + oreName);
+            killer.sendMessage(nameColor + "+" + amount + " " + oreName);
         }
     }
 }

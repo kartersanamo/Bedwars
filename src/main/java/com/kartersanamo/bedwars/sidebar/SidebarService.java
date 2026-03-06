@@ -13,9 +13,7 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.*;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -117,12 +115,12 @@ public final class SidebarService implements ISidebarManager {
         final Scoreboard scoreboard = viewer.getScoreboard();
         Objective healthObj = scoreboard.getObjective("bw_health");
         if (healthObj == null) {
-            healthObj = scoreboard.registerNewObjective("bw_health", "dummy", ChatColor.YELLOW + "HP");
+            healthObj = scoreboard.registerNewObjective("bw_health", Criteria.DUMMY, ChatColor.YELLOW + "HP", RenderType.HEARTS);
             healthObj.setDisplaySlot(DisplaySlot.PLAYER_LIST);
         }
 
         for (Player p : arena.getPlayers()) {
-            // Team-colored tab name with bold first letter.
+            // Team-colored tab name with bolding the first letter.
             final ITeam team = arena.getTeam(p).orElse(null);
             if (team != null) {
                 final ETeamColor color = team.getColor();
@@ -255,14 +253,14 @@ public final class SidebarService implements ISidebarManager {
             lines.add(line);
         }
         lines.add(blank(1));
-
-        final int kills = arena.getKillsThisGame(viewer.getUniqueId());
-        final int finalKills = arena.getFinalKillsThisGame(viewer.getUniqueId());
-        final int bedsBroken = arena.getBedsBrokenThisGame(viewer.getUniqueId());
-
-        lines.add(ChatColor.WHITE + "Kills: " + ChatColor.GREEN + kills);
-        lines.add(ChatColor.WHITE + "Final Kills: " + ChatColor.GREEN + finalKills);
-        lines.add(ChatColor.WHITE + "Beds Broken: " + ChatColor.GREEN + bedsBroken);
+//
+//        final int kills = arena.getKillsThisGame(viewer.getUniqueId());
+//        final int finalKills = arena.getFinalKillsThisGame(viewer.getUniqueId());
+//        final int bedsBroken = arena.getBedsBrokenThisGame(viewer.getUniqueId());
+//
+//        lines.add(ChatColor.WHITE + "Kills: " + ChatColor.GREEN + kills);
+//        lines.add(ChatColor.WHITE + "Final Kills: " + ChatColor.GREEN + finalKills);
+//        lines.add(ChatColor.WHITE + "Beds Broken: " + ChatColor.GREEN + bedsBroken);
 
         lines.add(blank(2));
         lines.add(ChatColor.YELLOW + "play.kartersanamo.com");

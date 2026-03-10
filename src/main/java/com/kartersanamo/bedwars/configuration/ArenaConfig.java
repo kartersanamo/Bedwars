@@ -9,7 +9,6 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -61,6 +60,54 @@ public final class ArenaConfig {
 
     public int getTeamSize(final int defaultTeamSize) {
         return configuration.getInt(ConfigPath.Arena.TEAM_SIZE, defaultTeamSize);
+    }
+
+    /**
+     * Gets the supported game modes for this arena.
+     * Returns a map of mode names to their configurations.
+     * Falls back to a single mode based on legacy min/max/team-size if modes section is not defined.
+     *
+     * @param defaultMinPlayers default minimum players
+     * @param defaultMaxPlayers default maximum players
+     * @param defaultTeamSize   default team size
+     * @return Map of mode names to ModeDefinition objects
+     */
+    public Map<String, ModeDefinition> getGameModes(final int defaultMinPlayers, final int defaultMaxPlayers, final int defaultTeamSize) {
+        final Map<String, ModeDefinition> result = new HashMap<>();
+        final ConfigurationSection modesSection = configuration.getConfigurationSection(ConfigPath.Arena.MODES);
+        
+        if (modesSection != null) {
+            // Load from modes section
+            for (String modeName : modesSection.getKeys(false)) {
+                final ConfigurationSection modeSection = modesSection.getConfigurationSection(modeName);
+                if (modeSection == null) {
+                    continue;
+                }
+                
+                final int minPlayers = modeSection.getInt(ConfigPath.Arena.MIN_PLAYERS, defaultMinPlayers);
+                final int maxPlayers = modeSection.getInt(ConfigPath.Arena.MAX_PLAYERS, defaultMaxPlayers);
+                final int teamSize = modeSection.getInt(ConfigPath.Arena.TEAM_SIZE, defaultTeamSize);
+                
+                result.put(modeName.toLowerCase(Locale.ROOT), new ModeDefinition(modeName, minPlayers, maxPlayers, teamSize));
+            }
+        } else {
+            // Backward compatibility: fall back to legacy min/max/team-size
+            final int minPlayers = getMinPlayers(defaultMinPlayers);
+            final int maxPlayers = getMaxPlayers(defaultMaxPlayers);
+            final int teamSize = getTeamSize(defaultTeamSize);
+            
+            // Determine mode name based on team size
+            final String modeName = switch (teamSize) {
+                case 1 -> "solo";
+                case 2 -> "doubles";
+                case 3 -> "threes";
+                default -> "fours";
+            };
+            
+            result.put(modeName, new ModeDefinition(modeName, minPlayers, maxPlayers, teamSize));
+        }
+        
+        return result;
     }
 
     public Location getLobbySpawn() {
@@ -140,10 +187,6 @@ public final class ArenaConfig {
             return Optional.empty();
         }
         return Optional.of(new Region(pos1, pos2));
-    }
-
-    public void save() throws IOException {
-        configuration.save(file);
     }
 
     public static List<ArenaConfig> loadAll(final File arenasDirectory, final Logger logger) {
@@ -287,6 +330,36 @@ public final class ArenaConfig {
 
         public Location getPos2() {
             return pos2;
+        }
+    }
+
+    public static final class ModeDefinition {
+        private final String name;
+        private final int minPlayers;
+        private final int maxPlayers;
+        private final int teamSize;
+
+        public ModeDefinition(final String name, final int minPlayers, final int maxPlayers, final int teamSize) {
+            this.name = Objects.requireNonNull(name, "name");
+            this.minPlayers = minPlayers;
+            this.maxPlayers = maxPlayers;
+            this.teamSize = teamSize;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public int getMinPlayers() {
+            return minPlayers;
+        }
+
+        public int getMaxPlayers() {
+            return maxPlayers;
+        }
+
+        public int getTeamSize() {
+            return teamSize;
         }
     }
 }

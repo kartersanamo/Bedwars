@@ -3,10 +3,25 @@ world: bedwars_world          # Name of the void world containing this map
 display-name: "Example Arena"
 enabled: true
 
-# Player counts and team size
-min-players: 2
-max-players: 16
-team-size: 4
+# Supported game modes with their player and team configurations
+# Each mode specifies min-players, max-players, and team-size
+modes:
+  solo:
+    min-players: 2
+    max-players: 8
+    team-size: 1
+  doubles:
+    min-players: 2
+    max-players: 8
+    team-size: 2
+  threes:
+    min-players: 3
+    max-players: 12
+    team-size: 3
+  fours:
+    min-players: 4
+    max-players: 16
+    team-size: 4
 
 # Lobby and spectator spawns (inside the arena world)
 lobby-spawn:
@@ -24,6 +39,22 @@ spectator-spawn:
   z: 0.5
   yaw: 0.0
   pitch: 0.0
+
+lobby-region:
+  pos1:
+    world: bedwars_world
+    x: 12
+    y: 124
+    z: -12
+    yaw: 0.0
+    pitch: 0.0
+  pos2:
+    world: bedwars_world
+    x: -12
+    y: 115
+    z: 12
+    yaw: 0.0
+    pitch: 0.0
 
 # Team configuration
 teams:

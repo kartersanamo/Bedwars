@@ -119,6 +119,8 @@ public final class ConfigPath {
         public static final String MAX_PLAYERS = "max-players";
         public static final String TEAM_SIZE = "team-size";
 
+        public static final String MODES = "modes";
+
         public static final String LOBBY_SPAWN = "lobby-spawn";
         public static final String SPECTATOR_SPAWN = "spectator-spawn";
 

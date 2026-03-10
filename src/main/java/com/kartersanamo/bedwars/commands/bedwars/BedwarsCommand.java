@@ -2,14 +2,7 @@ package com.kartersanamo.bedwars.commands.bedwars;
 
 import com.kartersanamo.bedwars.api.command.ASubCommand;
 import com.kartersanamo.bedwars.api.command.IParentCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.JoinSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.LeaveSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.StartSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.ForceStartSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.StopSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.ListSubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.GUISubCommand;
-import com.kartersanamo.bedwars.commands.bedwars.subcommands.CancelSubCommand;
+import com.kartersanamo.bedwars.commands.bedwars.subcommands.*;
 import com.kartersanamo.bedwars.gui.GameModeGui;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -29,6 +22,7 @@ public final class BedwarsCommand implements IParentCommand {
         registerSubCommand(new ListSubCommand());
         registerSubCommand(new GUISubCommand());
         registerSubCommand(new CancelSubCommand());
+        registerSubCommand(new NPCSubCommand());
     }
 
     private void registerSubCommand(final ASubCommand subCommand) {
@@ -41,14 +35,14 @@ public final class BedwarsCommand implements IParentCommand {
             if (sender instanceof org.bukkit.entity.Player player) {
                 GameModeGui.openFor(player);
             } else {
-                sender.sendMessage("Usage: /" + label + " <join|leave|start|stop|cancel|list|gui>");
+                sender.sendMessage("Usage: /" + label + " <join|leave|start|forcestart|stop|cancel|list|gui|npc>");
             }
             return true;
         }
 
         final ASubCommand sub = subCommands.get(args[0].toLowerCase(Locale.ROOT));
         if (sub == null) {
-            sender.sendMessage("Unknown subcommand. Use /" + label + " <join|leave|start|stop|cancel|list|gui>");
+            sender.sendMessage("Unknown subcommand. Use /" + label + " <join|leave|start|forcestart|stop|cancel|list|gui|npc>");
             return true;
         }
 

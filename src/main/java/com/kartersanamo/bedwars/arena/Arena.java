@@ -134,10 +134,11 @@ public final class Arena implements IArena {
     }
 
     public static Arena fromConfig(final ArenaConfig config,
+                                   final ArenaConfig.ModeDefinition modeDefinition,
+                                   final String arenaId,
                                    final MainConfig mainConfig,
                                    final JavaPlugin plugin,
                                    final World world) {
-        final String id = config.getId();
 
         // Rebind all locations to the per-arena instance world.
         final Location rawLobby = config.getLobbySpawn();
@@ -152,9 +153,9 @@ public final class Arena implements IArena {
                 rawSpectator.getYaw(), rawSpectator.getPitch())
                 : lobbySpawn;
 
-        final int minPlayers = config.getMinPlayers(mainConfig.getDefaultMinPlayers());
-        final int maxPlayers = config.getMaxPlayers(mainConfig.getDefaultMaxPlayers());
-        final int teamSize = config.getTeamSize(mainConfig.getDefaultTeamSize());
+        final int minPlayers = modeDefinition.getMinPlayers();
+        final int maxPlayers = modeDefinition.getMaxPlayers();
+        final int teamSize = modeDefinition.getTeamSize();
 
         final ArenaConfig.Region region = config.getArenaRegion()
                 .map(r -> new ArenaConfig.Region(
@@ -186,20 +187,8 @@ public final class Arena implements IArena {
             teams.add(new BedwarsTeam(def.getId(), def.getColor(), spawn, bed, plugin));
         }
 
-        return new Arena(
-                id,
-                config.getDisplayName(),
-                world,
-                lobbySpawn,
-                spectatorSpawn,
-                minPlayers,
-                maxPlayers,
-                teamSize,
-                region,
-                lobbyRegion,
-                teams,
-                plugin
-        );
+        return new Arena(arenaId, config.getDisplayName(), world, lobbySpawn, spectatorSpawn,
+                minPlayers, maxPlayers, teamSize, region, lobbyRegion, teams, plugin);
     }
 
     /**

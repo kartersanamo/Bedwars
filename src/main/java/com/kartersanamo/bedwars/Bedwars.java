@@ -15,12 +15,17 @@ import com.kartersanamo.bedwars.configuration.MainConfig;
 import com.kartersanamo.bedwars.configuration.SoundsConfig;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.database.SQLite;
+import com.kartersanamo.bedwars.gui.AdminArenaBrowserListener;
 import com.kartersanamo.bedwars.gui.GameModeGuiListener;
+import com.kartersanamo.bedwars.gui.MapSelectorGuiListener;
+import com.kartersanamo.bedwars.gui.PlayBedwarsGuiListener;
 import com.kartersanamo.bedwars.hologram.HologramManager;
 import com.kartersanamo.bedwars.listeners.*;
 import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import com.kartersanamo.bedwars.lobby.LobbyReturnListener;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
+import com.kartersanamo.bedwars.npc.NPCInteractionListener;
+import com.kartersanamo.bedwars.npc.NPCManager;
 import com.kartersanamo.bedwars.shop.ShopManager;
 import com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener;
 import com.kartersanamo.bedwars.shop.listeners.ShopOpenListener;
@@ -56,6 +61,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private UpgradeManager upgradeManager;
     private SidebarService sidebarService;
     private HologramManager hologramManager;
+    private NPCManager npcManager;
 
     @Override
     public void onEnable() {
@@ -75,6 +81,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         this.upgradeManager = new com.kartersanamo.bedwars.upgrades.UpgradeManager();
         this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
         this.hologramManager = new com.kartersanamo.bedwars.hologram.HologramManager(this);
+        this.npcManager = new NPCManager(this);
 
         initialiseDatabase();
         initialiseArenas();
@@ -91,6 +98,10 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new SidebarListener(sidebarService), this);
         getServer().getPluginManager().registerEvents(new LobbyReturnListener(this), this);
         getServer().getPluginManager().registerEvents(new GameModeGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new PlayBedwarsGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new MapSelectorGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new AdminArenaBrowserListener(), this);
+        getServer().getPluginManager().registerEvents(new NPCInteractionListener(this), this);
         getServer().getPluginManager().registerEvents(new SwordAndArmorEnforcementListener(this), this);
         getServer().getPluginManager().registerEvents(new ChestDepositListener(this), this);
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
@@ -102,6 +113,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
                 .setExecutor(bedwarsCommand::onCommand);
         Objects.requireNonNull(getCommand("bedwars"), "bedwars command not defined in plugin.yml")
                 .setTabCompleter(bedwarsCommand::onTabComplete);
+
 
         // /rejoin command
         if (getCommand("rejoin") != null) {
@@ -127,6 +139,16 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
             }
         }.runTaskTimer(this, 100L, 100L);
 
+        // Update NPC holograms every second.
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override
+            public void run() {
+                if (npcManager != null) {
+                    npcManager.updateHolograms();
+                }
+            }
+        }.runTaskTimer(this, 20L, 20L);
+
     }
 
     @Override
@@ -150,6 +172,9 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
         if (hologramManager != null) {
             hologramManager.clearAll();
+        }
+        if (npcManager != null) {
+            npcManager.clearAll();
         }
         if (database != null && database.isConnected()) {
             database.flushCache();
@@ -249,5 +274,9 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     public RejoinManager getRejoinManager() {
         return rejoinManager;
+    }
+
+    public NPCManager getNpcManager() {
+        return npcManager;
     }
 }

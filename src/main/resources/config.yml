@@ -5,24 +5,24 @@ lobby:
   world: world
   # Optional explicit spawn location inside the lobby world.
   # If omitted, the world's default spawn location is used.
-  # spawn:
-  #   world: world
-  #   x: 0.5
-  #   y: 65.0
-  #   z: 0.5
-  #   yaw: 0.0
-  #   pitch: 0.0
+  spawn:
+     world: world
+     x: -37.5
+     y: 72.0
+     z: 0.5
+     yaw: -90.0
+     pitch: 0.0
 
 arena:
   defaults:
     min-players: 2
-    max-players: 16
-    team-size: 4
+    max-players: 8
+    team-size: 1
 
 gameplay:
   respawn-delay-seconds: 5
   void-y: 0
-  # Max dropped items per generator on the ground; when reached, generator stops until items are picked up.
+  # Max dropped items per generator on the ground; when reached, the generator stops until items are picked up.
   # Spawn island: 48 iron, 12 gold per generator. Mid: 4 diamonds, 2 emeralds per generator.
   generator-caps:
     solo:

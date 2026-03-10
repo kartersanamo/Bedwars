@@ -8,6 +8,6 @@ softdepend: [PlaceholderAPI, Multiverse-Core]
 
 commands:
   bedwars:
-    description: Main Bedwars command.
+    description: Main Bedwars command, including NPC management.
     aliases: [bw]
-    usage: /bedwars <join|leave|start|forcestart|stop|cancel|list|gui>
+    usage: /bedwars <join|leave|start|forcestart|stop|cancel|list|gui|npc>

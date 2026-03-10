@@ -48,9 +48,12 @@ public final class SidebarService implements ISidebarManager {
         final ISidebar sidebar = sidebars.remove(player.getUniqueId());
         if (sidebar != null) {
             sidebar.remove();
+        } else {
+            player.setScoreboard(Objects.requireNonNull(Bukkit.getScoreboardManager()).getMainScoreboard());
         }
         removeLobbyBossBar(player);
         player.setPlayerListHeaderFooter("", "");
+        player.setPlayerListName(player.getName());
     }
 
     public void updateForArena(final IArena arena) {
@@ -145,7 +148,7 @@ public final class SidebarService implements ISidebarManager {
     private void ensureLobbyBossBar(final Player player) {
         final UUID uuid = player.getUniqueId();
         BossBar bar = lobbyBossBars.get(uuid);
-        final String title = ChatColor.YELLOW + "Playing " + ChatColor.WHITE + "" + ChatColor.BOLD + "BED WARS "
+        final String title = ChatColor.YELLOW + "Playing " + ChatColor.WHITE + ChatColor.BOLD + "BED WARS "
                 + ChatColor.YELLOW + "on " + ChatColor.AQUA + ChatColor.BOLD + "PLAY.KARTERSANAMO.COM";
         if (bar == null) {
             bar = Bukkit.createBossBar(title, BarColor.PURPLE, BarStyle.SOLID);

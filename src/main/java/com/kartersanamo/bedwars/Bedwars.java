@@ -16,7 +16,6 @@ import com.kartersanamo.bedwars.configuration.SoundsConfig;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.database.SQLite;
 import com.kartersanamo.bedwars.gui.AdminArenaBrowserListener;
-import com.kartersanamo.bedwars.gui.GameModeGuiListener;
 import com.kartersanamo.bedwars.gui.MapSelectorGuiListener;
 import com.kartersanamo.bedwars.gui.PlayBedwarsGuiListener;
 import com.kartersanamo.bedwars.hologram.HologramManager;
@@ -26,6 +25,7 @@ import com.kartersanamo.bedwars.lobby.LobbyReturnListener;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import com.kartersanamo.bedwars.npc.NPCInteractionListener;
 import com.kartersanamo.bedwars.npc.NPCManager;
+import com.kartersanamo.bedwars.npc.NPCStartupRepairListener;
 import com.kartersanamo.bedwars.shop.ShopManager;
 import com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener;
 import com.kartersanamo.bedwars.shop.listeners.ShopOpenListener;
@@ -34,6 +34,7 @@ import com.kartersanamo.bedwars.sidebar.SidebarService;
 import com.kartersanamo.bedwars.sidebar.SidebarUpdateTask;
 import com.kartersanamo.bedwars.upgrades.UpgradeManager;
 import com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -86,6 +87,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         initialiseDatabase();
         initialiseArenas();
 
+
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockBreakListener(this), this);
         getServer().getPluginManager().registerEvents(new MoveListener(this), this);
@@ -97,11 +99,11 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new UpgradesInventoryListener(upgradeManager), this);
         getServer().getPluginManager().registerEvents(new SidebarListener(sidebarService), this);
         getServer().getPluginManager().registerEvents(new LobbyReturnListener(this), this);
-        getServer().getPluginManager().registerEvents(new GameModeGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayBedwarsGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new MapSelectorGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new AdminArenaBrowserListener(), this);
         getServer().getPluginManager().registerEvents(new NPCInteractionListener(this), this);
+        getServer().getPluginManager().registerEvents(new NPCStartupRepairListener(this), this);
         getServer().getPluginManager().registerEvents(new SwordAndArmorEnforcementListener(this), this);
         getServer().getPluginManager().registerEvents(new ChestDepositListener(this), this);
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
@@ -149,6 +151,14 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
             }
         }.runTaskTimer(this, 20L, 20L);
 
+        // Initial NPC scan plus timed retries while startup world/chunk loading settles.
+        Bukkit.getScheduler().runTask(this, () -> {
+            final int loaded = npcManager.repairRuntimeMappings();
+            getLogger().info("NPC repair scan complete — " + loaded + " NPC(s) loaded.");
+            scheduleNpcRepairRetry(100L);
+            scheduleNpcRepairRetry(300L);
+        });
+
     }
 
     @Override
@@ -174,7 +184,8 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
             hologramManager.clearAll();
         }
         if (npcManager != null) {
-            npcManager.clearAll();
+            // Keep entities in the world; only clear runtime mappings.
+            npcManager.clearRuntimeCache();
         }
         if (database != null && database.isConnected()) {
             database.flushCache();
@@ -220,6 +231,23 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
             getLogger().warning("No Bedwars arenas are currently configured. " +
                     "Create configuration files under " + getDataFolder() + "/arenas");
         }
+    }
+
+    private void scheduleNpcRepairRetry(final long delayTicks) {
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (npcManager == null) {
+                return;
+            }
+            final int before = npcManager.getAllNPCs().size();
+            if (before > 0) {
+                return;
+            }
+            final int after = npcManager.repairRuntimeMappings();
+            if (after > 0) {
+                getLogger().info("NPC delayed repair succeeded after " + (delayTicks / 20.0D)
+                        + "s — loaded " + after + " NPC(s).");
+            }
+        }, delayTicks);
     }
 
     public static Bedwars getInstance() {

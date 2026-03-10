@@ -79,20 +79,12 @@ public final class ShopInventoryListener implements Listener {
         final IContentTier tier = holder.getTierAtContentIndex(contentIndex);
         final IArena arena = plugin.getArenaManager().getArena(player);
         if (event.isShiftClick()) {
-            // Shift-click behavior:
-            // - In any category view: add clicked tier to player's Quick Buy row.
-            // - In Quick Buy view, last row (indices 14–20): toggle/remove that slot.
             final String viewId = holder.getViewId();
-            if ("quick_buy".equalsIgnoreCase(viewId) && contentIndex >= 14) {
-                final int quickIndex = contentIndex - 14;
-                shopManager.clearQuickBuySlot(player, quickIndex);
+            if ("quick_buy".equalsIgnoreCase(viewId)) {
+                shopManager.clearQuickBuySlot(player, contentIndex);
                 shopManager.openView(player, "quick_buy", arena);
             } else if (tier != null) {
                 shopManager.addToQuickBuy(player, tier);
-                // If currently looking at Quick Buy, refresh so the row updates immediately.
-                if ("quick_buy".equalsIgnoreCase(viewId)) {
-                    shopManager.openView(player, "quick_buy", arena);
-                }
             }
         } else if (tier != null) {
             tryPurchase(player, tier, arena);

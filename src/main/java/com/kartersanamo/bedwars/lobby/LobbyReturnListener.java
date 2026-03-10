@@ -21,9 +21,9 @@ import java.util.UUID;
 
 /**
  * Handles the waiting-lobby \"Return to Lobby\" bed item.
- *
- * Right-click once: start 3 second timer to leave.
- * Right-click again during countdown: cancel and stay.
+ * <p>
+ * Right-click once: start a 3-second timer to leave.
+ * Right-click again during the countdown: cancel and stay.
  */
 public final class LobbyReturnListener implements Listener {
 
@@ -34,7 +34,7 @@ public final class LobbyReturnListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(final PlayerInteractEvent event) {
         final Action action = event.getAction();
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
@@ -82,6 +82,7 @@ public final class LobbyReturnListener implements Listener {
                 plugin.getArenaManager().playerLeftArena(player);
                 plugin.getSidebarService().removeSidebar(player);
                 LobbyReturnItem.removeFrom(player);
+                LobbyAnnouncementUtil.broadcastLeave(current, player);
 
                 if (plugin.getMainConfig().getLobbySpawn() != null) {
                     player.teleport(plugin.getMainConfig().getLobbySpawn());
@@ -106,4 +107,3 @@ public final class LobbyReturnListener implements Listener {
         }
     }
 }
-

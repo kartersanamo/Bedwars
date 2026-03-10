@@ -3,6 +3,7 @@ package com.kartersanamo.bedwars.commands.bedwars.subcommands;
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -42,8 +43,7 @@ public final class JoinSubCommand extends ASubCommand {
             return true;
         }
 
-        // Open the main GUI instead of direct join.
-        com.kartersanamo.bedwars.gui.GameModeGui.openFor(player);
+        sender.sendMessage(ChatColor.YELLOW + "Join through a Bedwars NPC.");
         return true;
     }
 }

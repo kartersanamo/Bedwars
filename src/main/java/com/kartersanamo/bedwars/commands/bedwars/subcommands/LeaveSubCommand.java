@@ -3,6 +3,7 @@ package com.kartersanamo.bedwars.commands.bedwars.subcommands;
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.command.ASubCommand;
+import com.kartersanamo.bedwars.lobby.LobbyAnnouncementUtil;
 import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -47,7 +48,7 @@ public final class LeaveSubCommand extends ASubCommand {
         plugin.getArenaManager().playerLeftArena(player);
         plugin.getSidebarService().removeSidebar(player);
         LobbyReturnItem.removeFrom(player);
-
+        LobbyAnnouncementUtil.broadcastLeave(arena, player);
         if (plugin.getMainConfig().getLobbySpawn() != null) {
             player.teleport(plugin.getMainConfig().getLobbySpawn());
         }

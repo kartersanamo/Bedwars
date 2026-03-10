@@ -71,7 +71,7 @@ public final class GameModeGuiListener implements Listener {
         player.teleport(arena.getLobbySpawn());
         final int current = arena.getPlayers().size();
         final int max = arena.getMaxPlayers();
-        final String joinMessage = ChatColor.WHITE + player.getName() + ChatColor.YELLOW + " has joined "
+        final String joinMessage = ChatColor.GRAY + player.getName() + ChatColor.YELLOW + " has joined "
                 + "(" + ChatColor.AQUA + current + ChatColor.YELLOW + "/" + ChatColor.AQUA + max + ChatColor.YELLOW + ")!";
         for (Player other : arena.getPlayers()) {
             other.sendMessage(joinMessage);

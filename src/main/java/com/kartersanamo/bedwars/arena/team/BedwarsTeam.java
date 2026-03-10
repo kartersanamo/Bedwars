@@ -5,7 +5,6 @@ import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
 
@@ -18,7 +17,6 @@ public final class BedwarsTeam implements ITeam {
     private final ETeamColor color;
     private final Location spawnLocation;
     private final Location bedLocation;
-    private final JavaPlugin plugin;
 
     private final Set<UUID> memberIds = new HashSet<>();
     private boolean bedDestroyed;
@@ -26,13 +24,11 @@ public final class BedwarsTeam implements ITeam {
     public BedwarsTeam(final String id,
                        final ETeamColor color,
                        final Location spawnLocation,
-                       final Location bedLocation,
-                       final JavaPlugin plugin) {
+                       final Location bedLocation) {
         this.id = Objects.requireNonNull(id, "id");
         this.color = Objects.requireNonNull(color, "color");
         this.spawnLocation = Objects.requireNonNull(spawnLocation, "spawnLocation");
         this.bedLocation = Objects.requireNonNull(bedLocation, "bedLocation");
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
     }
 
     @Override
@@ -67,17 +63,10 @@ public final class BedwarsTeam implements ITeam {
 
     @Override
     public boolean isEliminated() {
-        if (!bedDestroyed) {
-            return false;
-        }
-        // Eliminated when there are no living members left.
-        for (UUID uuid : memberIds) {
-            final Player player = Bukkit.getPlayer(uuid);
-            if (player != null && player.isOnline() && !player.isDead()) {
-                return false;
-            }
-        }
-        return true;
+        // A team is eliminated when their bed is gone AND they have no members remaining.
+        // Member removal happens when a player is fully eliminated from the arena
+        // (moved to spectators set), so an empty memberIds means nobody can respawn.
+        return bedDestroyed && memberIds.isEmpty();
     }
 
     @Override

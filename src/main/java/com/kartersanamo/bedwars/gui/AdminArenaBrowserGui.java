@@ -20,7 +20,7 @@ import java.util.List;
  */
 public final class AdminArenaBrowserGui {
 
-    public static final String TITLE = ChatColor.DARK_AQUA + "Bed Wars Admin Browser";
+    public static final String TITLE = "Bed Wars Admin Browser";
     private static final List<Integer> ARENA_SLOTS = List.of(
             10, 11, 12, 13, 14, 15, 16,
             19, 20, 21, 22, 23, 24, 25,

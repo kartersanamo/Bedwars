@@ -184,7 +184,7 @@ public final class Arena implements IArena {
             // Ensure the physical bed block matches the team color (e.g. RED_BED for red team).
             applyTeamBedColor(world, bed, def.getColor());
 
-            teams.add(new BedwarsTeam(def.getId(), def.getColor(), spawn, bed, plugin));
+            teams.add(new BedwarsTeam(def.getId(), def.getColor(), spawn, bed));
         }
 
         return new Arena(arenaId, config.getDisplayName(), world, lobbySpawn, spectatorSpawn,
@@ -429,9 +429,10 @@ public final class Arena implements IArena {
         // Assign all players to teams randomly, then teleport (addPlayer teleports to team spawn).
         assignAllPlayersToTeamsRandomly();
 
-        // Empty teams have no bed from the start: red X on scoreboard/list; their generators still run.
+        // Empty teams have no bed from the start: remove their bed silently and mark destroyed.
         for (ITeam team : teams) {
             if (team.getMemberIds().isEmpty()) {
+                removeTeamBedSilently(team);
                 team.setBedDestroyed(true);
             }
         }
@@ -782,8 +783,11 @@ public final class Arena implements IArena {
             // Bed was destroyed during the 3-second wait; eliminate now.
             players.remove(player.getUniqueId());
             spectators.add(player.getUniqueId());
+            teamOpt.ifPresent(iTeam -> iTeam.removePlayer(player));
             player.teleport(spectatorSpawn);
             player.setGameMode(GameMode.SPECTATOR);
+            player.sendMessage(ChatColor.RED + "You have been eliminated!");
+            checkGameOver();
             return;
         }
         final ITeam team = teamOpt.get();
@@ -835,6 +839,39 @@ public final class Arena implements IArena {
             p.sendMessage("");
             p.sendMessage(message);
             p.sendMessage("");
+        }
+
+        // If no members of this team are currently active (all are either pending
+        // respawn timers that will handle themselves, or already spectating with
+        // no active slot in the players set), check whether the team is already
+        // fully eliminated right now so the game can end without waiting for a
+        // respawn timer that will never come.
+        boolean anyActiveInArena = false;
+        for (UUID memberId : victimTeam.getMemberIds()) {
+            if (players.contains(memberId)) {
+                anyActiveInArena = true;
+                break;
+            }
+        }
+        if (!anyActiveInArena) {
+            // Purge stale memberIds for players who are already spectating
+            // (they were in spectator with bed still up, so memberIds wasn't cleared).
+            for (Player p : victimTeam.getOnlineMembers()) {
+                if (spectators.contains(p.getUniqueId())) {
+                    victimTeam.removePlayer(p);
+                    p.sendMessage(ChatColor.RED + "You have been eliminated!");
+                }
+            }
+            // Also clear any offline member stubs.
+            new ArrayList<>(victimTeam.getMemberIds()).stream()
+                    .filter(uid -> !players.contains(uid))
+                    .forEach(uid -> {
+                        final Player offline = Bukkit.getPlayer(uid);
+                        if (offline != null) {
+                            victimTeam.removePlayer(offline);
+                        }
+                    });
+            checkGameOver();
         }
     }
 
@@ -1476,6 +1513,32 @@ public final class Arena implements IArena {
                     world.getBlockAt(x, y, z).setType(org.bukkit.Material.AIR, false);
                 }
             }
+        }
+    }
+
+    private void removeTeamBedSilently(final ITeam team) {
+        final Bedwars bw = plugin instanceof Bedwars ? (Bedwars) plugin : Bedwars.getInstance();
+        if (bw == null) {
+            return;
+        }
+        final Location bedLoc = team.getBedLocation();
+        if (bedLoc == null || bedLoc.getWorld() == null || !bedLoc.getWorld().equals(world)) {
+            return;
+        }
+
+        final Block bedBlock = world.getBlockAt(bedLoc);
+        final BlockData data = bedBlock.getBlockData();
+        final com.kartersanamo.bedwars.maprestore.InternalAdapter adapter = bw.getInternalAdapter();
+
+        if (data instanceof Bed bedData) {
+            final Block otherHalf = getOtherBedHalf(bedBlock, bedData);
+            adapter.markModified(this, bedBlock);
+            adapter.markModified(this, otherHalf);
+            bedBlock.setType(Material.AIR, false);
+            otherHalf.setType(Material.AIR, false);
+        } else {
+            adapter.markModified(this, bedBlock);
+            bedBlock.setType(Material.AIR, false);
         }
     }
 }

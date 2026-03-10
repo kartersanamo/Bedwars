@@ -14,6 +14,7 @@ import org.bukkit.block.Chest;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -40,6 +41,9 @@ public final class ArenaManager {
     private final Map<UUID, IArena> arenaByPlayer = new HashMap<>();
 
     private static final String INSTANCE_WORLD_ROOT_FOLDER = "bedwars_worlds";
+
+    private static final String SHOP_NPC_ROLE = "shop";
+    private static final String UPGRADES_NPC_ROLE = "upgrades";
 
     public ArenaManager(final JavaPlugin plugin, final MainConfig mainConfig, final GeneratorsConfig generatorsConfig, final InternalAdapter internalAdapter, final GeneratorItemTracker generatorItemTracker) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -172,6 +176,11 @@ public final class ArenaManager {
                             villager.setInvulnerable(true);
                             villager.setSilent(true);
                             villager.setCustomNameVisible(false);
+                            villager.getPersistentDataContainer().set(
+                                    new NamespacedKey(plugin, "bw_npc_role"),
+                                    PersistentDataType.STRING,
+                                    SHOP_NPC_ROLE
+                            );
                         });
                         final double x = npcLoc.getX();
                         final double y = npcLoc.getY();
@@ -202,6 +211,11 @@ public final class ArenaManager {
                             villager.setInvulnerable(true);
                             villager.setSilent(true);
                             villager.setCustomNameVisible(false);
+                            villager.getPersistentDataContainer().set(
+                                    new NamespacedKey(plugin, "bw_npc_role"),
+                                    PersistentDataType.STRING,
+                                    UPGRADES_NPC_ROLE
+                            );
                         });
                         final double ux = upgLoc.getX();
                         final double uy = upgLoc.getY();

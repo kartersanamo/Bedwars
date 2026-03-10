@@ -55,23 +55,23 @@ public final class DeathListener implements Listener {
      * Call from DeathListener (real death) or DamageListener (fake death when damage would be lethal).
      */
     public static void handleArenaDeath(final Bedwars plugin, final Player victim, final Player killer, final IArena arena) {
+        final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
+
         if (killer != null && killer != victim && plugin.getArenaManager().getArena(killer) == arena) {
             transferOresToKiller(victim, killer);
         }
         arena.handlePlayerDeath(victim, killer);
-        updateDeathStats(plugin, arena, victim, killer);
+        updateDeathStats(plugin, victim, killer, finalKill);
         if (killer != null && killer != victim) {
             arena.recordKill(killer.getUniqueId());
-            final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
             if (finalKill) {
                 arena.recordFinalKill(killer.getUniqueId());
             }
-            broadcastKillMessage(arena, victim, killer);
+            broadcastKillMessage(arena, victim, killer, finalKill);
         }
     }
 
-    private static void broadcastKillMessage(final IArena arena, final Player victim, final Player killer) {
-        final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
+    private static void broadcastKillMessage(final IArena arena, final Player victim, final Player killer, final boolean finalKill) {
         ChatColor victimColor = ChatColor.WHITE;
         ChatColor killerColor = ChatColor.WHITE;
         if (arena.getTeam(victim).isPresent()) victimColor = arena.getTeam(victim).get().getColor().getChatColor();
@@ -86,14 +86,16 @@ public final class DeathListener implements Listener {
         }
     }
 
-    private static void updateDeathStats(final Bedwars plugin, final IArena arena, final Player victim, final Player killer) {
+    private static void updateDeathStats(final Bedwars plugin,
+                                         final Player victim,
+                                         final Player killer,
+                                         final boolean finalKill) {
         try {
             final PlayerStats victimStats = plugin.getDatabase().getCachedStats(victim.getUniqueId(), victim.getName());
             victimStats.incrementDeaths();
             if (killer != null && killer != victim) {
                 final PlayerStats killerStats = plugin.getDatabase().getCachedStats(killer.getUniqueId(), killer.getName());
                 killerStats.incrementKills();
-                final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
                 if (finalKill) {
                     killerStats.incrementFinalKills();
                 }

@@ -4,6 +4,7 @@ import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameMode;
 import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
+import com.kartersanamo.bedwars.lobby.LobbyAnnouncementUtil;
 import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -81,13 +82,7 @@ public final class PlayBedwarsGuiListener implements Listener {
         LobbyReturnItem.giveTo(player);
 
         player.teleport(arena.getLobbySpawn());
-        final int current = arena.getPlayers().size();
-        final int max = arena.getMaxPlayers();
-        final String joinMessage = ChatColor.WHITE + player.getName() + ChatColor.YELLOW + " has joined "
-                + "(" + ChatColor.AQUA + current + ChatColor.YELLOW + "/" + ChatColor.AQUA + max + ChatColor.YELLOW + ")!";
-        for (Player other : arena.getPlayers()) {
-            other.sendMessage(joinMessage);
-        }
+        LobbyAnnouncementUtil.broadcastJoin(arena, player);
 
         arena.tryStartCountdown();
         player.closeInventory();

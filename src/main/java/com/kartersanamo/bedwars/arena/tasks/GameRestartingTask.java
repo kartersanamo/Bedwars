@@ -5,8 +5,14 @@ import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.database.Database;
 import com.kartersanamo.bedwars.database.PlayerStats;
+import org.bukkit.GameMode;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Handles the short ending period and then resets the arena.
@@ -38,7 +44,10 @@ public final class GameRestartingTask extends BukkitRunnable {
         arena.setGameState(EGameState.RESETTING);
 
         final Database database = plugin.getDatabase();
-        for (Player player : arena.getPlayers()) {
+        final List<Player> players = new ArrayList<>(arena.getPlayers());
+        final List<Player> spectators = new ArrayList<>(arena.getSpectators());
+
+        for (Player player : players) {
             try {
                 final PlayerStats stats = database.getCachedStats(player.getUniqueId(), player.getName());
                 stats.incrementGamesPlayed();
@@ -53,24 +62,29 @@ public final class GameRestartingTask extends BukkitRunnable {
             player.getInventory().setChestplate(null);
             player.getInventory().setLeggings(null);
             player.getInventory().setBoots(null);
-            player.setHealth(player.getMaxHealth());
+            player.setHealth(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getDefaultValue());
             player.setFoodLevel(20);
+            player.setGameMode(GameMode.SURVIVAL);
             plugin.getSidebarService().removeSidebar(player);
             if (plugin.getMainConfig().getLobbySpawn() != null) {
                 player.teleport(plugin.getMainConfig().getLobbySpawn());
             }
-            // So the player can join another game without /bw leave.
+            arena.removePlayer(player, false);
             plugin.getArenaManager().playerLeftArena(player);
         }
-        for (Player spectator : arena.getSpectators()) {
+        for (Player spectator : spectators) {
             plugin.getSidebarService().removeSidebar(spectator);
             spectator.getInventory().setHelmet(null);
             spectator.getInventory().setChestplate(null);
             spectator.getInventory().setLeggings(null);
             spectator.getInventory().setBoots(null);
+            spectator.setHealth(Objects.requireNonNull(spectator.getAttribute(Attribute.MAX_HEALTH)).getDefaultValue());
+            spectator.setFoodLevel(20);
+            spectator.setGameMode(GameMode.SURVIVAL);
             if (plugin.getMainConfig().getLobbySpawn() != null) {
                 spectator.teleport(plugin.getMainConfig().getLobbySpawn());
             }
+            arena.removePlayer(spectator, false);
             plugin.getArenaManager().playerLeftArena(spectator);
         }
 

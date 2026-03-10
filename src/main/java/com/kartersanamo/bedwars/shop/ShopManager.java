@@ -45,8 +45,8 @@ public final class ShopManager {
 
     private final Map<String, ShopCategory> categories = new LinkedHashMap<>();
     private final List<IContentTier> defaultQuickBuyTiers = new ArrayList<>();
-    /** Per-player configurable Quick Buy row (last row in Quick Buy view, 7 slots). */
-    private final Map<UUID, IContentTier[]> playerQuickBuyRows = new HashMap<>();
+    /** Per-player configurable Quick Buy layout across all 21 content slots. */
+    private final Map<UUID, IContentTier[]> playerQuickBuyLayouts = new HashMap<>();
 
     public ShopManager() {
         loadDefaultShop();
@@ -72,6 +72,7 @@ public final class ShopManager {
         melee.addContent(new CategoryContent("stone_sword", List.of(ShopTiers.sword(Material.STONE_SWORD, 10, Material.IRON_INGOT))));
         melee.addContent(new CategoryContent("iron_sword", List.of(ShopTiers.sword(Material.IRON_SWORD, 7, Material.GOLD_INGOT))));
         melee.addContent(new CategoryContent("diamond_sword", List.of(ShopTiers.diamondSword())));
+        melee.addContent(new CategoryContent("kb_stick", List.of(ShopTiers.knockbackStick())));
         categories.put(melee.getId(), melee);
 
         // --- Armor ---
@@ -83,6 +84,7 @@ public final class ShopManager {
 
         // --- Tools ---
         final ShopCategory tools = new ShopCategory("tools", navIcon(Material.WOODEN_PICKAXE, "Tools"));
+        tools.addContent(new CategoryContent("shears", List.of(ShopTiers.shears(20))));
         tools.addContent(new CategoryContent("axe", List.of(
                 ShopTiers.axeUpgrade(ToolTier.WOOD, 10, Material.IRON_INGOT),
                 ShopTiers.axeUpgrade(ToolTier.STONE, 10, Material.IRON_INGOT),
@@ -95,7 +97,6 @@ public final class ShopManager {
                 ShopTiers.pickaxeUpgrade(ToolTier.GOLD, 3, Material.GOLD_INGOT),
                 ShopTiers.pickaxeUpgrade(ToolTier.DIAMOND, 6, Material.GOLD_INGOT)
         )));
-        tools.addContent(new CategoryContent("shears", List.of(ShopTiers.shears(20))));
         categories.put(tools.getId(), tools);
 
         // --- Ranged ---
@@ -106,16 +107,26 @@ public final class ShopManager {
         ranged.addContent(new CategoryContent("punch_bow", List.of(ShopTiers.punchBow())));
         categories.put(ranged.getId(), ranged);
 
-        // --- Potions (empty for now / seasonal) ---
+        // --- Potions ---
         final ShopCategory potions = new ShopCategory("potions", navIcon(Material.POTION, "Potions"));
+        potions.addContent(new CategoryContent("speed_potion", List.of(ShopTiers.speedPotion())));
+        potions.addContent(new CategoryContent("jump_potion", List.of(ShopTiers.jumpPotion())));
+        potions.addContent(new CategoryContent("invisibility_potion", List.of(ShopTiers.invisibilityPotion())));
         categories.put(potions.getId(), potions);
 
         // --- Utility ---
         final ShopCategory utility = new ShopCategory("utility", navIcon(Material.TNT, "Utility"));
         utility.addContent(new CategoryContent("gapple", List.of(ShopTiers.goldenApple())));
+        utility.addContent(new CategoryContent("bedbug", List.of(ShopTiers.bedbug())));
+        utility.addContent(new CategoryContent("dream_defender", List.of(ShopTiers.dreamDefender())));
+        utility.addContent(new CategoryContent("fireball", List.of(ShopTiers.fireball())));
+        utility.addContent(new CategoryContent("tnt", List.of(ShopTiers.tnt())));
         utility.addContent(new CategoryContent("ender_pearl", List.of(ShopTiers.enderPearl())));
-        utility.addContent(new CategoryContent("kb_stick", List.of(ShopTiers.knockbackStick())));
         utility.addContent(new CategoryContent("water_bucket", List.of(ShopTiers.item(Material.WATER_BUCKET, 1, 1, Material.EMERALD))));
+        utility.addContent(new CategoryContent("bridge_egg", List.of(ShopTiers.bridgeEgg())));
+        utility.addContent(new CategoryContent("magic_milk", List.of(ShopTiers.magicMilk())));
+        utility.addContent(new CategoryContent("sponge", List.of(ShopTiers.sponge())));
+        utility.addContent(new CategoryContent("popup_tower", List.of(ShopTiers.popupTower())));
         categories.put(utility.getId(), utility);
 
         // --- Rotating Items (empty for now / seasonal) ---
@@ -125,34 +136,51 @@ public final class ShopManager {
 
     private void buildDefaultQuickBuy() {
         defaultQuickBuyTiers.clear();
+
         final ShopCategory blocks = getCategory("blocks");
         final ShopCategory melee = getCategory("melee");
         final ShopCategory armor = getCategory("armor");
         final ShopCategory tools = getCategory("tools");
         final ShopCategory ranged = getCategory("ranged");
+        final ShopCategory potions = getCategory("potions");
         final ShopCategory utility = getCategory("utility");
-        collectFirstTier(blocks, defaultQuickBuyTiers);
-        defaultQuickBuyTiers.add(getTierAtSlot(melee, 0));
-        defaultQuickBuyTiers.add(getTierAtSlot(armor, 0));
-        defaultQuickBuyTiers.add(getTierAtSlot(tools, 0));
-        defaultQuickBuyTiers.add(getTierAtSlot(ranged, 0));
-        defaultQuickBuyTiers.add(getTierAtSlot(utility, 0));
-        defaultQuickBuyTiers.add(getTierAtSlot(utility, 1));
-        defaultQuickBuyTiers.add(getTierAtSlot(utility, 2));
-        defaultQuickBuyTiers.add(getTierAtSlot(utility, 3));
+
+        // 1st row: Wool, Stone Sword, Permanent Chain Armor, Wooden Pickaxe, Bow, Speed 2 potion, TNT
+        defaultQuickBuyTiers.add(getTierByContentId(blocks, "wool"));
+        defaultQuickBuyTiers.add(getTierByContentId(melee, "stone_sword"));
+        defaultQuickBuyTiers.add(getTierByContentId(armor, "chainmail"));
+        defaultQuickBuyTiers.add(getTierByContentId(tools, "pickaxe"));
+        defaultQuickBuyTiers.add(getTierByContentId(ranged, "bow"));
+        defaultQuickBuyTiers.add(getTierByContentId(potions, "speed_potion"));
+        defaultQuickBuyTiers.add(getTierByContentId(utility, "tnt"));
+
+        // 2nd row: Wood, Iron Sword, Permanent iron armor, Permanent shears, 6 Arrows, Invisibility Potion, Water Bucket
+        defaultQuickBuyTiers.add(getTierByContentId(blocks, "wood"));
+        defaultQuickBuyTiers.add(getTierByContentId(melee, "iron_sword"));
+        defaultQuickBuyTiers.add(getTierByContentId(armor, "iron_armor"));
+        defaultQuickBuyTiers.add(getTierByContentId(tools, "shears"));
+        defaultQuickBuyTiers.add(getTierByContentId(ranged, "arrows"));
+        defaultQuickBuyTiers.add(getTierByContentId(potions, "invisibility_potion"));
+        defaultQuickBuyTiers.add(getTierByContentId(utility, "water_bucket"));
+
         defaultQuickBuyTiers.removeIf(Objects::isNull);
     }
 
-    private static void collectFirstTier(final ShopCategory category, final List<IContentTier> out) {
-        if (category == null) return;
-        final int maxPerContent = 1;
-        for (CategoryContent content : category.getContents()) {
-            int n = 0;
-            for (IContentTier tier : content.getTiers()) {
-                if (n++ >= maxPerContent) break;
-                out.add(tier);
-            }
+    private IContentTier getTierByContentId(final ShopCategory category, final String contentId) {
+        if (category == null || contentId == null) {
+            return null;
         }
+        for (CategoryContent content : category.getContents()) {
+            if (!contentId.equalsIgnoreCase(content.getId())) {
+                continue;
+            }
+            final List<IContentTier> tiers = content.getTiers();
+            if (0 >= tiers.size()) {
+                return null;
+            }
+            return tiers.getFirst();
+        }
+        return null;
     }
 
     /** Opens the shop; default view is Quick Buy. */
@@ -166,19 +194,8 @@ public final class ShopManager {
         final ShopCategory category = "quick_buy".equals(viewId) ? null : getCategory(viewId);
         final List<IContentTier> contentTiers = new ArrayList<>(CONTENT_SLOTS.length);
         if ("quick_buy".equals(viewId)) {
-            // First two content rows: default quick buy layout (static).
-            for (int i = 0; i < CONTENT_SLOTS.length; i++) {
-                if (i < defaultQuickBuyTiers.size()) {
-                    contentTiers.add(defaultQuickBuyTiers.get(i));
-                } else {
-                    contentTiers.add(null);
-                }
-            }
-            // Last row (indices 14–20) overridden by per-player Quick Buy row.
-            final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
-            for (int i = 0; i < row.length; i++) {
-                contentTiers.set(14 + i, row[i]);
-            }
+            final IContentTier[] layout = getOrCreateQuickBuyLayout(player.getUniqueId());
+            contentTiers.addAll(Arrays.asList(layout));
         } else if ("tools".equals(viewId)) {
             contentTiers.addAll(getToolsNextTiers(category, player, arena));
         } else {
@@ -193,29 +210,31 @@ public final class ShopManager {
             inv.setItem(i, navItemForSlot(i));
         }
 
-        // Second row: divider panes (lime under Quick Buy, then gray).
-        inv.setItem(9, dividerPane(true));
-        for (int slot = 10; slot <= 17; slot++) {
-            inv.setItem(slot, dividerPane(false));
+        final int selectedNavIndex = getSelectedNavIndex(viewId);
+        // Second row: divider panes, with lime under the selected category.
+        for (int i = 0; i < NAV_ORDER.length; i++) {
+            inv.setItem(9 + i, dividerPane(i == selectedNavIndex));
         }
 
         // Rows 3–5: content items in mapped slots (no items in first/last column).
         for (int i = 0; i < CONTENT_SLOTS.length && i < contentTiers.size(); i++) {
             final IContentTier tier = contentTiers.get(i);
-            if ("quick_buy".equals(viewId) && i >= 14) {
-                // Last content row in Quick Buy: configurable Quick Buy bar.
-                if (tier != null) {
-                    inv.setItem(CONTENT_SLOTS[i], displayItem(tier, arena, player));
-                } else {
-                    inv.setItem(CONTENT_SLOTS[i], quickBuyEmptyPane());
-                }
-            } else {
-                if (tier != null) {
-                    inv.setItem(CONTENT_SLOTS[i], displayItem(tier, arena, player));
-                }
+            if ("quick_buy".equals(viewId)) {
+                inv.setItem(CONTENT_SLOTS[i], tier != null ? displayItem(tier, arena, player) : quickBuyEmptyPane());
+            } else if (tier != null) {
+                inv.setItem(CONTENT_SLOTS[i], displayItem(tier, arena, player));
             }
         }
         player.openInventory(inv);
+    }
+
+    private int getSelectedNavIndex(final String viewId) {
+        for (int i = 0; i < NAV_ORDER.length; i++) {
+            if (NAV_ORDER[i].equalsIgnoreCase(viewId)) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private static String viewTitle(final String viewId) {
@@ -281,13 +300,25 @@ public final class ShopManager {
                 lore.add(ChatColor.RED + "You don't have enough " + currencyName + "!");
             }
             meta.setLore(lore);
-            if (meta.hasDisplayName()) {
-                final String baseName = ChatColor.stripColor(meta.getDisplayName());
-                meta.setDisplayName((canPurchaseNow ? ChatColor.GREEN : ChatColor.RED) + baseName);
-            }
+
+            final String rawName = meta.hasDisplayName() ? ChatColor.stripColor(meta.getDisplayName()) : null;
+            final String baseName = (rawName == null || rawName.isBlank()) ? formatMaterialName(item.getType()) : rawName;
+            meta.setDisplayName((canPurchaseNow ? ChatColor.GREEN : ChatColor.RED) + baseName);
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private static String formatMaterialName(final Material material) {
+        final String[] words = material.name().toLowerCase(Locale.ROOT).split("_");
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) sb.append(' ');
+            if (!words[i].isEmpty()) {
+                sb.append(Character.toUpperCase(words[i].charAt(0))).append(words[i].substring(1));
+            }
+        }
+        return sb.toString();
     }
 
     private static String formatCurrency(final Material m) {
@@ -308,33 +339,40 @@ public final class ShopManager {
         return list;
     }
 
-    private IContentTier[] getOrCreateQuickBuyRow(final UUID uuid) {
-        return playerQuickBuyRows.computeIfAbsent(uuid, u -> new IContentTier[7]);
+    private IContentTier[] getOrCreateQuickBuyLayout(final UUID uuid) {
+        return playerQuickBuyLayouts.computeIfAbsent(uuid, u -> createDefaultQuickBuyLayout());
     }
 
-    /** Adds the given tier to the player's Quick Buy row (last row), in the first empty slot. */
+    private IContentTier[] createDefaultQuickBuyLayout() {
+        final IContentTier[] layout = new IContentTier[CONTENT_SLOTS.length];
+        for (int i = 0; i < layout.length && i < defaultQuickBuyTiers.size(); i++) {
+            layout[i] = defaultQuickBuyTiers.get(i);
+        }
+        return layout;
+    }
+
+    /** Adds the given tier to the player's Quick Buy layout, in the first empty slot. */
     public void addToQuickBuy(final Player player, final IContentTier tier) {
         if (tier == null) return;
-        final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
-        // Avoid duplicates.
-        for (IContentTier existing : row) {
+        final IContentTier[] layout = getOrCreateQuickBuyLayout(player.getUniqueId());
+        for (IContentTier existing : layout) {
             if (existing == tier) {
                 return;
             }
         }
-        for (int i = 0; i < row.length; i++) {
-            if (row[i] == null) {
-                row[i] = tier;
+        for (int i = 0; i < layout.length; i++) {
+            if (layout[i] == null) {
+                layout[i] = tier;
                 break;
             }
         }
     }
 
-    /** Clears a specific Quick Buy slot (0–6) for the player. */
+    /** Clears a specific Quick Buy slot (0-20) for the player. */
     public void clearQuickBuySlot(final Player player, final int index) {
-        if (index < 0 || index >= 7) return;
-        final IContentTier[] row = getOrCreateQuickBuyRow(player.getUniqueId());
-        row[index] = null;
+        if (index < 0 || index >= CONTENT_SLOTS.length) return;
+        final IContentTier[] layout = getOrCreateQuickBuyLayout(player.getUniqueId());
+        layout[index] = null;
     }
 
     private static ItemStack dividerPane(final boolean primary) {
@@ -406,19 +444,6 @@ public final class ShopManager {
 
     public String[] getNavOrder() {
         return NAV_ORDER.clone();
-    }
-
-    /** Returns the tier at content slot index (0-based) for the given category. */
-    public IContentTier getTierAtSlot(final ShopCategory category, final int slot) {
-        if (category == null || slot < 0) return null;
-        int index = 0;
-        for (CategoryContent content : category.getContents()) {
-            for (IContentTier tier : content.getTiers()) {
-                if (index == slot) return tier;
-                index++;
-            }
-        }
-        return null;
     }
 
     private static ItemStack navIcon(final Material material, final String name) {

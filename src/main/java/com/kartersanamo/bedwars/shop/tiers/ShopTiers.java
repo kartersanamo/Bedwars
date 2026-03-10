@@ -6,12 +6,18 @@ import com.kartersanamo.bedwars.api.arena.team.ITeam;
 import com.kartersanamo.bedwars.arena.Arena;
 import com.kartersanamo.bedwars.arena.kit.ArmorTier;
 import com.kartersanamo.bedwars.arena.kit.ToolTier;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
 
 /**
  * Factory and implementations for shop tiers (item, wool, armor upgrade, tools, etc.).
@@ -50,10 +56,6 @@ public final class ShopTiers {
 
     public static IContentTier sword(final Material swordType, final int cost, final Material currency) {
         return new SwordUpgradeTier(swordType, cost, currency);
-    }
-
-    public static IContentTier bow(final ItemStack bow, final int cost, final Material currency) {
-        return new ItemTier(bow, cost, currency);
     }
 
     public static IContentTier powerBow() {
@@ -106,6 +108,95 @@ public final class ShopTiers {
             stick.setItemMeta(meta);
         }
         return new ItemTier(stick, 5, Material.GOLD_INGOT);
+    }
+
+    public static IContentTier tnt() {
+        final ItemStack item = new ItemStack(Material.TNT);
+        final ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(org.bukkit.ChatColor.RED + "TNT");
+            item.setItemMeta(meta);
+        }
+        return new ItemTier(item, 4, Material.GOLD_INGOT);
+    }
+
+    public static IContentTier speedPotion() {
+        final ItemStack item = new ItemStack(Material.POTION);
+        final PotionMeta meta = (PotionMeta) item.getItemMeta();
+        if (meta != null) {
+            meta.setBasePotionType(PotionType.SWIFTNESS);
+            meta.addCustomEffect(new PotionEffect(PotionEffectType.SPEED, 45 * 20, 1), true);
+            meta.setDisplayName(org.bukkit.ChatColor.WHITE + "Speed II Potion");
+            item.setItemMeta(meta);
+        }
+        return new ItemTier(item, 1, Material.EMERALD);
+    }
+
+    public static IContentTier invisibilityPotion() {
+        final ItemStack item = new ItemStack(Material.POTION);
+        final PotionMeta meta = (PotionMeta) item.getItemMeta();
+        if (meta != null) {
+            meta.setBasePotionType(PotionType.INVISIBILITY);
+            meta.addCustomEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 30 * 20, 0), true);
+            meta.setDisplayName(org.bukkit.ChatColor.WHITE + "Invisibility Potion");
+            item.setItemMeta(meta);
+        }
+        return new ItemTier(item, 2, Material.EMERALD);
+    }
+
+    public static IContentTier jumpPotion() {
+        final ItemStack item = new ItemStack(Material.POTION);
+        final PotionMeta meta = (PotionMeta) item.getItemMeta();
+        if (meta != null) {
+            meta.setBasePotionType(PotionType.LEAPING);
+            meta.addCustomEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 45 * 20, 4), true);
+            meta.setDisplayName(ChatColor.WHITE + "Jump V Potion");
+            item.setItemMeta(meta);
+        }
+        return new ItemTier(item, 1, Material.EMERALD);
+    }
+
+    public static IContentTier bedbug() {
+        return namedItem(Material.SILVERFISH_SPAWN_EGG, 1, ChatColor.GREEN + "Bedbug", 40, Material.IRON_INGOT);
+    }
+
+    public static IContentTier dreamDefender() {
+        return namedItem(Material.IRON_GOLEM_SPAWN_EGG, 1, ChatColor.GREEN + "Dream Defender", 120, Material.IRON_INGOT);
+    }
+
+    public static IContentTier fireball() {
+        return namedItem(Material.FIRE_CHARGE, 1, ChatColor.GREEN + "Fireball", 40, Material.IRON_INGOT);
+    }
+
+    public static IContentTier bridgeEgg() {
+        return namedItem(Material.EGG, 1, ChatColor.GREEN + "Bridge Egg", 1, Material.EMERALD);
+    }
+
+    public static IContentTier magicMilk() {
+        return namedItem(Material.MILK_BUCKET, 1, ChatColor.GREEN + "Magic Milk", 4, Material.GOLD_INGOT);
+    }
+
+    public static IContentTier sponge() {
+        return namedItem(Material.SPONGE, 4, ChatColor.GREEN + "Sponge", 3, Material.GOLD_INGOT);
+    }
+
+    public static IContentTier popupTower() {
+        return namedItem(Material.CHEST, 1, ChatColor.GREEN + "Compact Pop-Up Tower", 24, Material.IRON_INGOT);
+    }
+
+    private static IContentTier namedItem(final Material material,
+                                          final int amount,
+                                          final String displayName,
+                                          final int cost,
+                                          final Material currency) {
+        final ItemStack item = new ItemStack(material, amount);
+        final ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(displayName);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            item.setItemMeta(meta);
+        }
+        return new ItemTier(item, cost, currency);
     }
 
     private static ItemStack unbreakable(final ItemStack stack) {
@@ -198,7 +289,7 @@ public final class ShopTiers {
 
         @Override
         public ItemStack getItem() {
-            return new ItemStack(tier.getLeggings());
+            return new ItemStack(tier.getBoots());
         }
 
         @Override

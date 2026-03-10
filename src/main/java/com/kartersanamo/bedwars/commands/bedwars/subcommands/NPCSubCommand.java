@@ -18,6 +18,7 @@ public final class NPCSubCommand extends ASubCommand {
         register(new NPCDeleteSubCommand());
         register(new NPCListSubCommand());
         register(new NPCRemoveSubCommand());
+        register(new NPCRepairSubCommand());
     }
 
     private void register(final ASubCommand subCommand) {
@@ -36,7 +37,7 @@ public final class NPCSubCommand extends ASubCommand {
 
     @Override
     public String getUsage() {
-        return "/bw npc <spawn|delete|list|remove>";
+        return "/bw npc <spawn|delete|list|remove|repair>";
     }
 
     @Override
@@ -53,7 +54,7 @@ public final class NPCSubCommand extends ASubCommand {
 
         final ASubCommand sub = npcSubCommands.get(args[0].toLowerCase(Locale.ROOT));
         if (sub == null) {
-            sender.sendMessage(ChatColor.RED + "Unknown npc subcommand. Use /bw npc <spawn|delete|list|remove>");
+            sender.sendMessage(ChatColor.RED + "Unknown npc subcommand. Use /bw npc <spawn|delete|list|remove|repair>");
             return true;
         }
 

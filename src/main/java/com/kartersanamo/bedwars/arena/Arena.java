@@ -1218,6 +1218,18 @@ public final class Arena implements IArena {
         gameState = EGameState.LOBBY_WAITING;
     }
 
+    /** Stops lobby countdown and in-game tick tasks (e.g. before arena reload). */
+    public void cancelScheduledTasks() {
+        if (startingTask != null) {
+            startingTask.cancel();
+            startingTask = null;
+        }
+        if (playingTask != null) {
+            playingTask.cancel();
+            playingTask = null;
+        }
+    }
+
     /**
      * Shuffles all current players and assigns them to teams in round-robin order.
      * Each player is then added to their team (which teleports them to the team spawn).

@@ -54,6 +54,24 @@ public final class ArenaManager {
         this.logger = plugin.getLogger();
     }
 
+    /**
+     * Reloads all arenas from disk. Cancels per-arena tasks, clears holograms,
+     * and rebuilds the arena registry. Intended for admins after editing arena YAML.
+     */
+    public void reloadArenas() {
+        for (final IArena arena : new ArrayList<>(arenasById.values())) {
+            if (arena instanceof Arena concrete) {
+                concrete.cancelScheduledTasks();
+            }
+        }
+        arenasById.clear();
+        arenaByPlayer.clear();
+        if (plugin instanceof Bedwars bw && bw.getHologramManager() != null) {
+            bw.getHologramManager().clearAll();
+        }
+        loadArenas();
+    }
+
     public void loadArenas() {
         arenasById.clear();
         arenaByPlayer.clear();

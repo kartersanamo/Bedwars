@@ -22,6 +22,8 @@ public final class BedwarsCommand implements IParentCommand {
         registerSubCommand(new ListSubCommand());
         registerSubCommand(new CancelSubCommand());
         registerSubCommand(new NPCSubCommand());
+        registerSubCommand(new SetupSubCommand());
+        registerSubCommand(new ReloadSubCommand());
     }
 
     private void registerSubCommand(final ASubCommand subCommand) {
@@ -32,13 +34,13 @@ public final class BedwarsCommand implements IParentCommand {
     public boolean onCommand(final CommandSender sender, final Command command, final String label, final String[] args) {
         if (args.length == 0) {
             sender.sendMessage(ChatColor.YELLOW + "Use NPCs to join games.");
-            sender.sendMessage(ChatColor.GRAY + "Admin commands: /" + label + " <join|leave|start|forcestart|stop|cancel|list|npc>");
+            sender.sendMessage(ChatColor.GRAY + "Admin: /" + label + " <setup|reload|join|leave|start|forcestart|stop|cancel|list|npc>");
             return true;
         }
 
         final ASubCommand sub = subCommands.get(args[0].toLowerCase(Locale.ROOT));
         if (sub == null) {
-            sender.sendMessage("Unknown subcommand. Use /" + label + " <join|leave|start|forcestart|stop|cancel|list|npc>");
+            sender.sendMessage("Unknown subcommand. Use /" + label + " <setup|reload|join|leave|start|forcestart|stop|cancel|list|npc>");
             return true;
         }
 

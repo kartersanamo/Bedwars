@@ -6,7 +6,7 @@
 
     <groupId>com.kartersanamo</groupId>
     <artifactId>Bedwars</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <name>Bedwars</name>

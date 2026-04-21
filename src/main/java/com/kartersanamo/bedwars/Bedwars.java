@@ -31,6 +31,8 @@ import com.kartersanamo.bedwars.shop.listeners.ShopInventoryListener;
 import com.kartersanamo.bedwars.shop.listeners.ShopOpenListener;
 import com.kartersanamo.bedwars.sidebar.SidebarListener;
 import com.kartersanamo.bedwars.sidebar.SidebarService;
+import com.kartersanamo.bedwars.setup.SetupWizardListener;
+import com.kartersanamo.bedwars.setup.SetupWizardService;
 import com.kartersanamo.bedwars.sidebar.SidebarUpdateTask;
 import com.kartersanamo.bedwars.upgrades.UpgradeManager;
 import com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener;
@@ -38,6 +40,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -63,6 +66,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private SidebarService sidebarService;
     private HologramManager hologramManager;
     private NPCManager npcManager;
+    private SetupWizardService setupWizardService;
 
     @Override
     public void onEnable() {
@@ -83,6 +87,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
         this.hologramManager = new com.kartersanamo.bedwars.hologram.HologramManager(this);
         this.npcManager = new NPCManager(this);
+        this.setupWizardService = new SetupWizardService(this);
 
         initialiseDatabase();
         initialiseArenas();
@@ -108,6 +113,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new ChestDepositListener(this), this);
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
         getServer().getPluginManager().registerEvents(new RejoinListener(this), this);
+        getServer().getPluginManager().registerEvents(new SetupWizardListener(setupWizardService), this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
         final BedwarsCommand bedwarsCommand = new BedwarsCommand();
@@ -157,6 +163,9 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
             getLogger().info("NPC repair scan complete — " + loaded + " NPC(s) loaded.");
             scheduleNpcRepairRetry(100L);
             scheduleNpcRepairRetry(300L);
+            scheduleNpcRepairRetry(600L);
+            scheduleNpcRepairRetry(1200L);
+            startNpcRepairUntilLoaded();
         });
 
     }
@@ -239,15 +248,43 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
                 return;
             }
             final int before = npcManager.getAllNPCs().size();
-            if (before > 0) {
-                return;
-            }
             final int after = npcManager.repairRuntimeMappings();
-            if (after > 0) {
-                getLogger().info("NPC delayed repair succeeded after " + (delayTicks / 20.0D)
-                        + "s — loaded " + after + " NPC(s).");
+            if (after > before) {
+                getLogger().info("NPC delayed repair after " + (delayTicks / 20.0D)
+                        + "s — now " + after + " NPC(s) mapped (was " + before + ").");
             }
         }, delayTicks);
+    }
+
+    /**
+     * Periodically rescans for NPC entities until at least one is mapped or 36 attempts elapse
+     * (~7 minutes at 10s intervals). Handles hubs where NPC chunks load only after players are active.
+     */
+    private void startNpcRepairUntilLoaded() {
+        new BukkitRunnable() {
+            private int tries;
+
+            @Override
+            public void run() {
+                if (npcManager == null) {
+                    cancel();
+                    return;
+                }
+                if (!npcManager.getAllNPCs().isEmpty()) {
+                    cancel();
+                    return;
+                }
+                if (++tries > 36) {
+                    cancel();
+                    return;
+                }
+                final int after = npcManager.repairRuntimeMappings();
+                if (after > 0) {
+                    getLogger().info("NPC background repair loaded " + after + " NPC(s) after " + tries + " attempt(s).");
+                    cancel();
+                }
+            }
+        }.runTaskTimer(this, 200L, 200L);
     }
 
     public static Bedwars getInstance() {
@@ -306,5 +343,16 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
 
     public NPCManager getNpcManager() {
         return npcManager;
+    }
+
+    public SetupWizardService getSetupWizardService() {
+        return setupWizardService;
+    }
+
+    /** Reloads arena definitions from disk (admin). */
+    public void reloadArenas() {
+        if (arenaManager != null) {
+            arenaManager.reloadArenas();
+        }
     }
 }

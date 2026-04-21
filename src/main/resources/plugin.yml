@@ -1,6 +1,6 @@
 name: Bedwars
 description: Bedwars minigame by Karter Sanamo
-version: '1.0.0'
+version: '1.0.2'
 main: com.kartersanamo.bedwars.Bedwars
 api-version: '1.21'
 author: Karter Sanamo
@@ -10,4 +10,12 @@ commands:
   bedwars:
     description: Main Bedwars command.
     aliases: [bw]
-    usage: /bedwars <join|leave|start|forcestart|stop|cancel|list|npc>
+    usage: /bedwars <setup|reload|join|leave|start|forcestart|stop|cancel|list|npc>
+
+permissions:
+  bedwars.admin.setup:
+    description: Use the in-world arena setup wizard (/bw setup).
+    default: op
+  bedwars.admin.reload:
+    description: Reload arenas from disk (/bw reload).
+    default: op

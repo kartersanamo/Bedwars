@@ -58,7 +58,7 @@ public final class SetupSubCommand extends ASubCommand {
             return true;
         }
         if (createNew) {
-            final String safeId = arenaId.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
+            final String safeId = arenaId.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
             final File file = new File(plugin.getDataFolder(), "arenas/" + safeId + ".yml");
             if (file.exists()) {
                 sender.sendMessage(ChatColor.RED + "An arena file already exists for '" + safeId + "'. Use /bedwars setup " + safeId + " to edit it.");

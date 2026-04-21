@@ -10,7 +10,7 @@ commands:
   bedwars:
     description: Main Bedwars command.
     aliases: [bw]
-    usage: /bedwars <setup|reload|join|leave|start|forcestart|stop|cancel|list|npc>
+    usage: /bedwars <setup|reload|arena|join|leave|start|forcestart|stop|cancel|list|npc>
 
 permissions:
   bedwars.admin.setup:

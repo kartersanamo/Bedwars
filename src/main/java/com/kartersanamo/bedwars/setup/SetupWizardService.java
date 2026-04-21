@@ -8,7 +8,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -69,6 +68,12 @@ public final class SetupWizardService {
             this.yaml = yaml;
             this.inventoryBackup = inventoryBackup;
         }
+
+        /** File id / slug (e.g. {@code jurassic}); for player text prefer {@link #displayLabel()}. */
+        String displayLabel() {
+            final String dn = yaml.getString(ConfigPath.Arena.DISPLAY_NAME);
+            return dn != null && !dn.isBlank() ? dn : arenaId;
+        }
     }
 
     private static final class PendingModeSelection {
@@ -122,33 +127,48 @@ public final class SetupWizardService {
             exitWithoutReload(player);
         }
         abandonPendingModeSelectionSilently(player);
-        final String arenaId = arenaIdRaw.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
-        final File file = new File(plugin.getDataFolder(), "arenas/" + arenaId + ".yml");
+        final String arenaSlug = sanitizeArenaFileId(arenaIdRaw);
+        if (arenaSlug.isEmpty()) {
+            throw new IOException("Invalid arena name: use at least one letter, number, dash or underscore in the id.");
+        }
+        final String displayName = displayNameFromCommand(arenaIdRaw, arenaSlug);
+        final File file = new File(plugin.getDataFolder(), "arenas/" + arenaSlug + ".yml");
         final YamlConfiguration yaml = ArenaSetupYamlIO.loadOrCreate(file);
         final boolean missingWorld = !yaml.contains(ConfigPath.Arena.WORLD);
         final boolean freshScaffold = createNew || missingWorld;
         if (freshScaffold) {
             if (missingWorld) {
-                applyBaseArenaScaffold(player, yaml, arenaId);
+                applyBaseArenaScaffold(player, yaml, displayName);
             }
             yaml.set(ConfigPath.Arena.MODES, null);
-            pendingModeSelection.put(player.getUniqueId(), new PendingModeSelection(arenaId, file, yaml, createNew));
+            pendingModeSelection.put(player.getUniqueId(), new PendingModeSelection(arenaSlug, file, yaml, createNew));
             openModeSelectionGui(player);
-            player.sendMessage(ChatColor.GREEN + "New arena '" + arenaId + "' — choose which game modes to support.");
+            player.sendMessage(ChatColor.GREEN + "New arena '" + displayName + "' — choose which game modes to support.");
             player.sendMessage(ChatColor.GRAY + "All four are enabled by default (typical public map). Click wool to toggle. "
                     + "Lime concrete confirms and gives you setup tools; barrier cancels.");
             ArenaSetupYamlIO.save(yaml, file);
             return;
         }
-        enterSetupWithTools(player, arenaId, file, yaml);
+        enterSetupWithTools(player, arenaSlug, file, yaml);
+    }
+
+    /** Lowercase file key: {@code arenas/<id>.yml}. */
+    private static String sanitizeArenaFileId(final String raw) {
+        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
+    }
+
+    /** {@code display-name} in YAML: same text as typed (trimmed), except blank → file id. */
+    private static String displayNameFromCommand(final String raw, final String arenaSlugFallback) {
+        final String t = raw.trim();
+        return t.isEmpty() ? arenaSlugFallback : t;
     }
 
     /**
      * Writes world/display/root defaults only; {@code modes} is filled after the mode GUI confirms.
      */
-    private static void applyBaseArenaScaffold(final Player player, final YamlConfiguration yaml, final String arenaId) {
+    private static void applyBaseArenaScaffold(final Player player, final YamlConfiguration yaml, final String displayName) {
         yaml.set(ConfigPath.Arena.WORLD, player.getWorld().getName());
-        yaml.set(ConfigPath.Arena.DISPLAY_NAME, arenaId);
+        yaml.set(ConfigPath.Arena.DISPLAY_NAME, displayName);
         yaml.set(ConfigPath.Arena.ENABLED, false);
         // Player limits live under modes.* only (same layout as reference arena.yml files).
     }
@@ -170,8 +190,9 @@ public final class SetupWizardService {
         final ItemStack[] backup = cloneContents(player.getInventory().getContents());
         sessions.put(player.getUniqueId(), new Session(arenaId, file, yaml, backup));
         applyMainHotbar(player);
-        player.sendMessage(ChatColor.GREEN + "Setup wizard for arena '" + arenaId + "'. Your inventory was backed up.");
-        player.sendMessage(ChatColor.GRAY + "Right-click with each tool to set points. Use the book to pick a team. Barrier exits without saving reload.");
+        player.sendMessage(ChatColor.GREEN + "Setup wizard for arena '" + yaml.getString(ConfigPath.Arena.DISPLAY_NAME, arenaId)
+                + "' (" + arenaId + ".yml). Your inventory was backed up.");
+        player.sendMessage(ChatColor.GRAY + "Stand where each point should be, then right-click (saves feet + facing). Use the book to pick a team. Barrier exits without saving reload.");
         save(player);
     }
 
@@ -202,6 +223,10 @@ public final class SetupWizardService {
         restoreInventory(player, s);
         plugin.reloadArenas();
         player.sendMessage(ChatColor.GREEN + "Arena YAML saved and arenas reloaded.");
+        if (!s.yaml.getBoolean(ConfigPath.Arena.ENABLED, true)) {
+            player.sendMessage(ChatColor.GRAY + "This arena stays off until you enable it: "
+                    + ChatColor.WHITE + "/bw arena enable " + s.arenaId + ChatColor.GRAY + " (writes YAML and reloads).");
+        }
     }
 
     public void onQuit(final Player player) {
@@ -558,7 +583,7 @@ public final class SetupWizardService {
         }
         save(player);
         final String facing = ArenaSetupYamlIO.describeCardinalFacing(loc.getYaw(), loc.getPitch());
-        player.sendMessage(ChatColor.GREEN + "Updated arena '" + s.arenaId + "' (" + kind + "). "
+        player.sendMessage(ChatColor.GREEN + "Updated arena '" + s.displayLabel() + "' (" + kind + "). "
                 + ChatColor.GRAY + "Facing saved (cardinal snap): " + facing + ".");
     }
 
@@ -566,23 +591,9 @@ public final class SetupWizardService {
         return ConfigPath.Arena.TEAMS + "." + s.editingTeam.name() + "." + field;
     }
 
-    /**
-     * Position from targeted block (or feet on block), with the player's current look direction
-     * so yaw/pitch are saved for spawns and NPCs.
-     */
+    /** Player feet position and look direction (never raycast to a target block). */
     private Location targetLocation(final Player player) {
-        final Location feet = player.getLocation();
-        final Block b = player.getTargetBlockExact(8);
-        if (b != null) {
-            final Location out = b.getLocation().clone().add(0.5, 0.0, 0.5);
-            out.setYaw(feet.getYaw());
-            out.setPitch(feet.getPitch());
-            return out;
-        }
-        final Location out = feet.getBlock().getLocation().clone().add(0.5, 0.0, 0.5);
-        out.setYaw(feet.getYaw());
-        out.setPitch(feet.getPitch());
-        return out;
+        return player.getLocation().clone();
     }
 
     private void save(final Player player) throws IOException {
@@ -594,26 +605,26 @@ public final class SetupWizardService {
     }
 
     private void applyMainHotbar(final Player player) {
-        player.getInventory().setItem(0, tag(ToolKind.MAIN_DIAMOND_GEN, Material.DIAMOND, ChatColor.AQUA + "Add diamond generator", "Right-click at generator block."));
-        player.getInventory().setItem(1, tag(ToolKind.MAIN_EMERALD_GEN, Material.EMERALD, ChatColor.GREEN + "Add emerald generator", "Right-click at generator block."));
-        player.getInventory().setItem(2, tag(ToolKind.MAIN_LOBBY_SPAWN, Material.RED_BED, ChatColor.RED + "Lobby spawn", "Right-click where players wait."));
-        player.getInventory().setItem(3, tag(ToolKind.MAIN_SPEC_SPAWN, Material.ENDER_EYE, ChatColor.LIGHT_PURPLE + "Spectator spawn", "Right-click spectator join point."));
-        player.getInventory().setItem(4, tag(ToolKind.MAIN_LOBBY_P1, Material.IRON_BLOCK, ChatColor.GRAY + "Lobby region corner 1", ""));
-        player.getInventory().setItem(5, tag(ToolKind.MAIN_LOBBY_P2, Material.GOLD_BLOCK, ChatColor.GRAY + "Lobby region corner 2", ""));
-        player.getInventory().setItem(6, tag(ToolKind.MAIN_ARENA_P1, Material.STONE, ChatColor.DARK_GRAY + "Arena region corner 1", ""));
-        player.getInventory().setItem(7, tag(ToolKind.MAIN_ARENA_P2, Material.POLISHED_ANDESITE, ChatColor.DARK_GRAY + "Arena region corner 2", ""));
+        player.getInventory().setItem(0, tag(ToolKind.MAIN_DIAMOND_GEN, Material.DIAMOND, ChatColor.AQUA + "Add diamond generator", "Stand at generator, right-click."));
+        player.getInventory().setItem(1, tag(ToolKind.MAIN_EMERALD_GEN, Material.EMERALD, ChatColor.GREEN + "Add emerald generator", "Stand at generator, right-click."));
+        player.getInventory().setItem(2, tag(ToolKind.MAIN_LOBBY_SPAWN, Material.RED_BED, ChatColor.RED + "Lobby spawn", "Stand in lobby, right-click."));
+        player.getInventory().setItem(3, tag(ToolKind.MAIN_SPEC_SPAWN, Material.ENDER_EYE, ChatColor.LIGHT_PURPLE + "Spectator spawn", "Stand at spectator spawn, right-click."));
+        player.getInventory().setItem(4, tag(ToolKind.MAIN_LOBBY_P1, Material.IRON_BLOCK, ChatColor.GRAY + "Lobby region corner 1", "Stand at corner, right-click."));
+        player.getInventory().setItem(5, tag(ToolKind.MAIN_LOBBY_P2, Material.GOLD_BLOCK, ChatColor.GRAY + "Lobby region corner 2", "Stand at corner, right-click."));
+        player.getInventory().setItem(6, tag(ToolKind.MAIN_ARENA_P1, Material.STONE, ChatColor.DARK_GRAY + "Arena region corner 1", "Stand at corner, right-click."));
+        player.getInventory().setItem(7, tag(ToolKind.MAIN_ARENA_P2, Material.POLISHED_ANDESITE, ChatColor.DARK_GRAY + "Arena region corner 2", "Stand at corner, right-click."));
         player.getInventory().setItem(8, tag(ToolKind.MAIN_TEAM_PICKER, Material.WRITABLE_BOOK, ChatColor.YELLOW + "Team editor",
                 "Right-click: pick team. Shift-right: exit wizard."));
         player.updateInventory();
     }
 
     private void applyTeamHotbar(final Player player, final ETeamColor color) {
-        player.getInventory().setItem(0, tag(ToolKind.TEAM_SPAWN, color.getWoolMaterial(), color.getChatColor() + "Team spawn", ""));
-        player.getInventory().setItem(1, tag(ToolKind.TEAM_BED, bedMaterial(color), color.getChatColor() + "Team bed", ""));
-        player.getInventory().setItem(2, tag(ToolKind.TEAM_SHOP, Material.EMERALD, ChatColor.GREEN + "Item shop NPC", ""));
-        player.getInventory().setItem(3, tag(ToolKind.TEAM_UPGRADE, Material.ENCHANTING_TABLE, ChatColor.LIGHT_PURPLE + "Upgrades NPC", ""));
-        player.getInventory().setItem(4, tag(ToolKind.TEAM_IRON_GEN, Material.IRON_INGOT, ChatColor.WHITE + "Add iron generator", ""));
-        player.getInventory().setItem(5, tag(ToolKind.TEAM_GOLD_GEN, Material.GOLD_INGOT, ChatColor.GOLD + "Add gold generator", ""));
+        player.getInventory().setItem(0, tag(ToolKind.TEAM_SPAWN, color.getWoolMaterial(), color.getChatColor() + "Team spawn", "Stand at spawn, right-click."));
+        player.getInventory().setItem(1, tag(ToolKind.TEAM_BED, bedMaterial(color), color.getChatColor() + "Team bed", "Stand at bed, right-click."));
+        player.getInventory().setItem(2, tag(ToolKind.TEAM_SHOP, Material.EMERALD, ChatColor.GREEN + "Item shop NPC", "Stand at NPC spot, right-click."));
+        player.getInventory().setItem(3, tag(ToolKind.TEAM_UPGRADE, Material.ENCHANTING_TABLE, ChatColor.LIGHT_PURPLE + "Upgrades NPC", "Stand at NPC spot, right-click."));
+        player.getInventory().setItem(4, tag(ToolKind.TEAM_IRON_GEN, Material.IRON_INGOT, ChatColor.WHITE + "Add iron generator", "Stand at generator, right-click."));
+        player.getInventory().setItem(5, tag(ToolKind.TEAM_GOLD_GEN, Material.GOLD_INGOT, ChatColor.GOLD + "Add gold generator", "Stand at generator, right-click."));
         player.getInventory().setItem(6, tag(ToolKind.TEAM_BACK, Material.BOOK, ChatColor.YELLOW + "Back to main tools", ""));
         player.getInventory().setItem(7, tag(ToolKind.TEAM_SAVE_RELOAD, Material.NETHER_STAR, ChatColor.GREEN + "Save + reload arenas", ""));
         player.getInventory().setItem(8, tag(ToolKind.TEAM_EXIT, Material.BARRIER, ChatColor.RED + "Exit wizard", "Does not auto-reload."));

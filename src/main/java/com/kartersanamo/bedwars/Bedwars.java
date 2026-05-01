@@ -35,7 +35,10 @@ import com.kartersanamo.bedwars.sidebar.SidebarService;
 import com.kartersanamo.bedwars.sidebar.SidebarUpdateTask;
 import com.kartersanamo.bedwars.upgrades.UpgradeManager;
 import com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener;
+import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -152,6 +155,16 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
                 }
             }
         }.runTaskTimer(this, 20L, 20L);
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            for (World world : Bukkit.getWorlds()) {
+                // Force load chunks to deserialize entities from disk
+                for (Chunk chunk : world.getLoadedChunks()) {
+                    chunk.load(true); // Force load the chunk
+                }
+            }
+            npcManager.repairNPCs();
+        }, 60L); // 3 seconds delay
     }
 
     @Override

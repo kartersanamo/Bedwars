@@ -31,7 +31,7 @@ public final class NPCRepairSubCommand extends ASubCommand {
     public boolean execute(final CommandSender sender, final String[] args) {
         final Bedwars plugin = Bedwars.getInstance();
         final int before = plugin.getNpcManager().getAllNPCs().size();
-        final int after = plugin.getNpcManager().repairRuntimeMappings();
+        final int after = plugin.getNpcManager().repairNPCs();
 
         sender.sendMessage(ChatColor.GREEN + "NPC repair complete.");
         sender.sendMessage(ChatColor.GRAY + "Before: " + ChatColor.YELLOW + before + ChatColor.GRAY

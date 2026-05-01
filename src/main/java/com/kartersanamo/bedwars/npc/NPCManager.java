@@ -125,7 +125,6 @@ public final class NPCManager {
 
     /**
      * Rebuild in-memory NPC mappings from tagged entities in loaded worlds.
-     * Also performs a legacy recovery pass for old NPCs without tags.
      */
     public void loadExistingNPCs() {
         clearRuntimeCache();
@@ -133,6 +132,8 @@ public final class NPCManager {
         final Map<String, LoadedNpcParts> grouped = new HashMap<>();
 
         for (World world : Bukkit.getWorlds()) {
+            plugin.getLogger().info("Loading NPCs from world " + world.getName() +
+                    " (entity count: " + world.getEntities().size() + ")");
             for (Entity entity : world.getEntities()) {
                 final PersistentDataContainer pdc = entity.getPersistentDataContainer();
                 final String npcId = pdc.get(npcIdKey, PersistentDataType.STRING);
@@ -147,6 +148,8 @@ public final class NPCManager {
                 if (gameMode == null) {
                     continue;
                 }
+
+                plugin.getLogger().info("NPC " + entity.getUniqueId() + " is " + gameMode + ", and found in world " + world.getName());
 
                 final LoadedNpcParts parts = grouped.computeIfAbsent(npcId, k -> new LoadedNpcParts(gameMode));
                 parts.gameMode = gameMode;
@@ -174,6 +177,8 @@ public final class NPCManager {
         final int total = loaded;
         if (total > 0) {
             plugin.getLogger().info("Loaded " + total + " persisted NPC(s) on startup");
+        } else {
+            plugin.getLogger().info("No persisted NPCs found on startup");
         }
     }
 
@@ -311,7 +316,7 @@ public final class NPCManager {
      *
      * @return number of NPCs currently mapped after repair
      */
-    public int repairRuntimeMappings() {
+    public int repairNPCs() {
         loadExistingNPCs();
         return spawners.size();
     }

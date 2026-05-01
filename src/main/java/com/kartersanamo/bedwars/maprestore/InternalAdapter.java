@@ -42,6 +42,8 @@ public final class InternalAdapter {
                 for (int z = min.getBlockZ(); z <= max.getBlockZ(); z++) {
                     final Block block = world.getBlockAt(x, y, z);
                     final BlockData data = block.getBlockData().clone();
+                    if (data.getMaterial().isAir()) return;
+
                     snapshot.put(new BlockPosition(x, y, z), data);
                 }
             }

@@ -11,7 +11,7 @@ import org.bukkit.scheduler.BukkitTask;
 /**
  * Keeps trying to map persisted NPC entities after chunks/worlds become active.
  * <p>
- * At plugin enable, lobby chunks often are not loaded yet, so the first scan sees 0 NPCs.
+ * At plugin enabled, lobby chunks often are not loaded yet, so the first scan sees 0 NPCs.
  * This listener schedules a debounced {@link NPCManager#repairRuntimeMappings()} whenever
  * a player joins while no NPCs are mapped, so the same fix as {@code /bw npc repair} runs
  * automatically without admin action.
@@ -19,9 +19,8 @@ import org.bukkit.scheduler.BukkitTask;
 public final class NPCStartupRepairListener implements Listener {
 
     private static final long JOIN_REPAIR_DELAY_TICKS = 60L;
-    /** Minimum wall time between join-triggered repair schedules (coalesce rapid joins). */
-    private static final long DEBOUNCE_MS = 2000L;
 
+    private boolean hasRepaired;
     private final Bedwars plugin;
     private BukkitTask pendingJoinRepair;
     private long lastJoinRepairScheduleMs;
@@ -32,6 +31,9 @@ public final class NPCStartupRepairListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(final PlayerJoinEvent event) {
+        if (hasRepaired) {
+            return;
+        }
         if (plugin.getNpcManager() == null) {
             return;
         }
@@ -39,9 +41,6 @@ public final class NPCStartupRepairListener implements Listener {
             return;
         }
         final long nowMs = System.currentTimeMillis();
-        if (nowMs - lastJoinRepairScheduleMs < DEBOUNCE_MS) {
-            return;
-        }
         lastJoinRepairScheduleMs = nowMs;
 
         if (pendingJoinRepair != null) {
@@ -60,6 +59,7 @@ public final class NPCStartupRepairListener implements Listener {
             }
             final int after = plugin.getNpcManager().repairRuntimeMappings();
             if (after > 0) {
+                hasRepaired = true;
                 plugin.getLogger().info("NPC auto-repair after join by " + player.getName() + " — loaded " + after + " NPC(s).");
             }
         }, JOIN_REPAIR_DELAY_TICKS);

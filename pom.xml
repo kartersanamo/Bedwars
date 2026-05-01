@@ -6,7 +6,7 @@
 
     <groupId>com.kartersanamo</groupId>
     <artifactId>Bedwars</artifactId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>Bedwars</name>
@@ -38,6 +38,24 @@
                         <goals>
                             <goal>shade</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <configuration>
+                            <tasks>
+                                <copy file="target/Bedwars-1.1.0.jar"
+                                      todir="/path/to/server/plugins/" />
+                            </tasks>
+                        </configuration>
+                        <goals><goal>run</goal></goals>
                     </execution>
                 </executions>
             </plugin>

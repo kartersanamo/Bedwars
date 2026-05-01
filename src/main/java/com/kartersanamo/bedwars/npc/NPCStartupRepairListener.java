@@ -23,7 +23,6 @@ public final class NPCStartupRepairListener implements Listener {
     private boolean hasRepaired;
     private final Bedwars plugin;
     private BukkitTask pendingJoinRepair;
-    private long lastJoinRepairScheduleMs;
 
     public NPCStartupRepairListener(final Bedwars plugin) {
         this.plugin = plugin;
@@ -40,8 +39,6 @@ public final class NPCStartupRepairListener implements Listener {
         if (!plugin.getNpcManager().getAllNPCs().isEmpty()) {
             return;
         }
-        final long nowMs = System.currentTimeMillis();
-        lastJoinRepairScheduleMs = nowMs;
 
         if (pendingJoinRepair != null) {
             pendingJoinRepair.cancel();

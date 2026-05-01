@@ -46,14 +46,15 @@
             </plugin>
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.2.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
                         <configuration>
-                            <tasks>
+                            <target>
                                 <copy file="target/Bedwars-1.1.0.jar"
-                                      todir="/path/to/server/plugins/" />
-                            </tasks>
+                                      todir="/Users/kartersanamo/Documents/Minecraft Servers/Bedwars Server/plugins/" />
+                            </target>
                         </configuration>
                         <goals><goal>run</goal></goals>
                     </execution>

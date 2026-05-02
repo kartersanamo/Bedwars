@@ -264,8 +264,6 @@ public final class SidebarService implements ISidebarManager {
 //        lines.add(ChatColor.WHITE + "Kills: " + ChatColor.GREEN + kills);
 //        lines.add(ChatColor.WHITE + "Final Kills: " + ChatColor.GREEN + finalKills);
 //        lines.add(ChatColor.WHITE + "Beds Broken: " + ChatColor.GREEN + bedsBroken);
-
-        lines.add(blank(2));
         lines.add(ChatColor.YELLOW + "play.kartersanamo.com");
         return lines;
     }

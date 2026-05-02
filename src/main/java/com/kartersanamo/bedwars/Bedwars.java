@@ -120,6 +120,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
         getServer().getPluginManager().registerEvents(new RejoinListener(this), this);
         getServer().getPluginManager().registerEvents(new SetupWizardListener(setupWizardService), this);
+        getServer().getPluginManager().registerEvents(new LobbyListeners(), this);
         getServer().getPluginManager().registerEvents(slimeJumpManager, this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
@@ -138,7 +139,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         // Slime jumps
         slimeJumpManager.registerJump(new SlimeJump(
                 "spawn",
-                new Location(Bukkit.getWorld("world"), -30, 66, 0),
+                new Location(mainConfig.getLobbyWorld(), -30, 66, 0),
                 2.0)
         );
 

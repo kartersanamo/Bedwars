@@ -64,8 +64,8 @@ public final class GameStartingTask extends BukkitRunnable {
                 || secondsRemaining == 1) {
             final ChatColor numberColor = secondsRemaining <= 5 ? ChatColor.RED : secondsRemaining == 10 ? ChatColor.GOLD: ChatColor.AQUA;
             final String unit = secondsRemaining == 1 ? " second!" : " seconds!";
-            final String message = ChatColor.GOLD + "The game starts in " + numberColor + secondsRemaining
-                    + ChatColor.GOLD + unit;
+            final String message = ChatColor.YELLOW + "The game starts in " + numberColor + secondsRemaining
+                    + ChatColor.YELLOW + unit;
             for (Player player : arena.getPlayers()) {
                 player.sendMessage(message);
                 player.sendTitle(

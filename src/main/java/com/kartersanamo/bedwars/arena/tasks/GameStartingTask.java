@@ -35,14 +35,14 @@ public final class GameStartingTask extends BukkitRunnable {
         if (currentPlayers < minPlayers || currentPlayers < threshold) {
             arena.setGameState(EGameState.LOBBY_WAITING);
             for (Player player : arena.getPlayers()) {
-                player.sendMessage(ChatColor.YELLOW + "Countdown cancelled due to insufficient players.");
+                player.sendMessage(ChatColor.RED + "Countdown cancelled due to insufficient players.");
             }
             cancel();
             return;
         }
 
-        // If the lobby reaches 100% capacity and we still have more than 10s left,
-        // accelerate the countdown to 10 seconds.
+        // If the lobby reaches 100% capacity, and we still have more than 10s left,
+        // speed up the countdown to 10 seconds.
         if (currentPlayers >= maxPlayers && secondsRemaining > 10) {
             secondsRemaining = 10;
         }
@@ -62,16 +62,15 @@ public final class GameStartingTask extends BukkitRunnable {
                 || secondsRemaining == 3
                 || secondsRemaining == 2
                 || secondsRemaining == 1) {
-            final ChatColor numberColor = secondsRemaining <= 5 ? ChatColor.RED : ChatColor.GOLD;
+            final ChatColor numberColor = secondsRemaining <= 5 ? ChatColor.RED : secondsRemaining == 10 ? ChatColor.GOLD: ChatColor.AQUA;
             final String unit = secondsRemaining == 1 ? " second!" : " seconds!";
             final String message = ChatColor.GOLD + "The game starts in " + numberColor + secondsRemaining
                     + ChatColor.GOLD + unit;
-            final String subtitle = secondsRemaining == 1 ? "second" : "seconds";
             for (Player player : arena.getPlayers()) {
                 player.sendMessage(message);
                 player.sendTitle(
                         numberColor.toString() + secondsRemaining,
-                        ChatColor.GRAY + subtitle,
+                        null,
                         5, 25, 5
                 );
             }

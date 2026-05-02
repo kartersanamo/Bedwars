@@ -138,4 +138,6 @@ public interface IArena {
 
     /** Next tier upgrade line for scoreboard (e.g. "Diamond II in 5:36"); updates every second. */
     String getNextTierUpgradeMessage();
+
+    Double getLobbyThreshold();
 }

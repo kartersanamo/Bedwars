@@ -87,6 +87,10 @@ public final class Arena implements IArena {
     private static final int BASE_TRAP_RADIUS = 10;
     private static final int HEAL_POOL_RADIUS = 12;
 
+    // Threshold to start a game as a percentage of the max players
+    // .25 for testing | .75 for prod
+    private final Double LOBBY_THRESHOLD = 0.25D;
+
     private final JavaPlugin plugin;
 
     private boolean enabled = true;
@@ -400,7 +404,8 @@ public final class Arena implements IArena {
             return;
         }
 
-        final int threshold = (int) Math.ceil(maxPlayers * 0.75D);
+        // Countdown starts when 75% of slots are filled.
+        final int threshold = (int) Math.ceil(maxPlayers *  LOBBY_THRESHOLD);
         if (playerCount < threshold) {
             return;
         }
@@ -410,7 +415,7 @@ public final class Arena implements IArena {
         if (startingTask != null) {
             startingTask.cancel();
         }
-        // Base countdown is 30 seconds once 75% of slots are filled.
+
         startingTask = new GameStartingTask(this, 30);
         startingTask.runTaskTimer(plugin, 20L, 20L);
     }
@@ -1552,5 +1557,10 @@ public final class Arena implements IArena {
             adapter.markModified(this, bedBlock);
             bedBlock.setType(Material.AIR, false);
         }
+    }
+
+    @Override
+    public Double getLobbyThreshold() {
+        return LOBBY_THRESHOLD;
     }
 }

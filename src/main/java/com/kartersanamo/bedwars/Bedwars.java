@@ -33,6 +33,8 @@ import com.kartersanamo.bedwars.shop.listeners.ShopOpenListener;
 import com.kartersanamo.bedwars.sidebar.SidebarListener;
 import com.kartersanamo.bedwars.sidebar.SidebarService;
 import com.kartersanamo.bedwars.sidebar.SidebarUpdateTask;
+import com.kartersanamo.bedwars.slimejumps.SlimeJump;
+import com.kartersanamo.bedwars.slimejumps.SlimeJumpManager;
 import com.kartersanamo.bedwars.upgrades.UpgradeManager;
 import com.kartersanamo.bedwars.upgrades.UpgradesInventoryListener;
 import org.bukkit.Bukkit;
@@ -45,6 +47,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 public final class Bedwars extends JavaPlugin implements IBedwars {
@@ -63,10 +66,13 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
     private InternalAdapter internalAdapter;
     private ShopManager shopManager;
     private UpgradeManager upgradeManager;
+    private SlimeJumpManager slimeJumpManager;
     private SidebarService sidebarService;
     private HologramManager hologramManager;
     private NPCManager npcManager;
     private SetupWizardService setupWizardService;
+
+    private List<SlimeJump> slimeJumpList;
 
     @Override
     public void onEnable() {
@@ -82,10 +88,11 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         this.internalAdapter = new InternalAdapter();
         this.generatorItemTracker = new GeneratorItemTracker(this);
         this.rejoinManager = new RejoinManager();
-        this.shopManager = new com.kartersanamo.bedwars.shop.ShopManager();
-        this.upgradeManager = new com.kartersanamo.bedwars.upgrades.UpgradeManager();
-        this.sidebarService = new com.kartersanamo.bedwars.sidebar.SidebarService(this);
-        this.hologramManager = new com.kartersanamo.bedwars.hologram.HologramManager(this);
+        this.shopManager = new ShopManager();
+        this.upgradeManager = new UpgradeManager();
+        this.slimeJumpManager = new SlimeJumpManager();
+        this.sidebarService = new SidebarService(this);
+        this.hologramManager = new HologramManager(this);
         this.npcManager = new NPCManager(this);
         this.setupWizardService = new SetupWizardService(this);
 
@@ -113,6 +120,7 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         getServer().getPluginManager().registerEvents(new HungerListener(this), this);
         getServer().getPluginManager().registerEvents(new RejoinListener(this), this);
         getServer().getPluginManager().registerEvents(new SetupWizardListener(setupWizardService), this);
+        getServer().getPluginManager().registerEvents(slimeJumpManager, this);
         getServer().getPluginManager().registerEvents(generatorItemTracker, this);
 
         final BedwarsCommand bedwarsCommand = new BedwarsCommand();
@@ -126,6 +134,13 @@ public final class Bedwars extends JavaPlugin implements IBedwars {
         if (getCommand("rejoin") != null) {
             Objects.requireNonNull(getCommand("rejoin")).setExecutor(new RejoinCommand(this));
         }
+
+        // Slime jumps
+        slimeJumpManager.registerJump(new SlimeJump(
+                "spawn",
+                new Location(Bukkit.getWorld("world"), -30, 66, 0),
+                2.0)
+        );
 
         // Start global generator ticking task.
         new OneTickGenerators(this).runTaskTimer(this, 1L, 1L);

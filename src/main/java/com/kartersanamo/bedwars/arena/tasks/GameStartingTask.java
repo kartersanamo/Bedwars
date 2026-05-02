@@ -30,8 +30,8 @@ public final class GameStartingTask extends BukkitRunnable {
         final int minPlayers = arena.getMinPlayers();
         final int maxPlayers = arena.getMaxPlayers();
 
-        // Cancel countdown if we ever drop below min players or 75% capacity.
-        final int threshold = (int) Math.ceil(maxPlayers * 0.75D);
+        // Cancel countdown if we ever drop below min players or the threshold
+        final int threshold = (int) Math.ceil(maxPlayers * arena.getLobbyThreshold());
         if (currentPlayers < minPlayers || currentPlayers < threshold) {
             arena.setGameState(EGameState.LOBBY_WAITING);
             for (Player player : arena.getPlayers()) {

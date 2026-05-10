@@ -122,7 +122,8 @@ public final class AdminArenaBrowserGui {
         lore.add(ChatColor.GRAY + "Mode: " + ChatColor.GREEN + modeName(arena.getTeamSize()));
         lore.add(ChatColor.GRAY + "World: " + ChatColor.GREEN + (arena.getWorld() != null ? arena.getWorld().getName() : "Unknown"));
         lore.add(" ");
-        lore.add(ChatColor.YELLOW + "Click to print quick details in chat");
+        lore.add(ChatColor.YELLOW + "Left-click" + ChatColor.GRAY + " — print quick details");
+        lore.add(ChatColor.YELLOW + "Right-click" + ChatColor.GRAY + " — refresh map (recopy template world)");
 
         meta.setLore(lore);
         item.setItemMeta(meta);

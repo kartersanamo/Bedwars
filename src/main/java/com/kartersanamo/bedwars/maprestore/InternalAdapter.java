@@ -24,6 +24,17 @@ public final class InternalAdapter {
     private final Map<String, Map<BlockPosition, BlockData>> arenaSnapshots = new HashMap<>();
     private final Map<String, Set<BlockPosition>> modifiedBlocks = new HashMap<>();
 
+    /**
+     * Drops in-memory snapshot / modified-block tracking for an arena (e.g. before its world folder is replaced).
+     */
+    public void forgetArena(final String arenaId) {
+        if (arenaId == null) {
+            return;
+        }
+        arenaSnapshots.remove(arenaId);
+        modifiedBlocks.remove(arenaId);
+    }
+
     public void snapshotArena(final IArena arena, final ArenaConfig.Region region) {
         Objects.requireNonNull(arena, "arena");
         Objects.requireNonNull(region, "region");

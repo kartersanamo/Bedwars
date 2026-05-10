@@ -72,6 +72,19 @@ public final class AdminArenaBrowserListener implements Listener {
             if (!strippedName.equalsIgnoreCase(key)) {
                 continue;
             }
+
+            if (event.isRightClick()) {
+                final String error = plugin.getArenaManager().refreshArenaWorldCopy(arena.getId());
+                if (error != null) {
+                    player.sendMessage(ChatColor.RED + error);
+                } else {
+                    player.sendMessage(ChatColor.GREEN + "Refreshed arena world from template: "
+                            + ChatColor.WHITE + arena.getId());
+                }
+                AdminArenaBrowserGui.openFor(player, page);
+                return;
+            }
+
             player.sendMessage(ChatColor.AQUA + "[Arena] " + ChatColor.WHITE + arena.getId()
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + arena.getDisplayName()
                     + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + arena.getGameState().name()

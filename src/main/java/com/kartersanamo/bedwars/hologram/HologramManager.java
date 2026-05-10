@@ -2,6 +2,7 @@ package com.kartersanamo.bedwars.hologram;
 
 import com.kartersanamo.bedwars.Bedwars;
 import com.kartersanamo.bedwars.api.arena.EGameState;
+import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
 import com.kartersanamo.bedwars.api.arena.generator.IGenerator;
 import com.kartersanamo.bedwars.arena.OreGenerator;
@@ -49,6 +50,55 @@ public final class HologramManager {
                 }
             }
         });
+    }
+
+    /**
+     * Removes diamond/emerald generator holograms tracked for the given arena.
+     */
+    public void removeGeneratorHologramsForArena(final IArena arena) {
+        if (arena == null) {
+            return;
+        }
+        final Iterator<Map.Entry<IGenerator, List<ArmorStand>>> genIt = hologramsByGenerator.entrySet().iterator();
+        while (genIt.hasNext()) {
+            final Map.Entry<IGenerator, List<ArmorStand>> e = genIt.next();
+            if (!e.getKey().getArena().equals(arena)) {
+                continue;
+            }
+            for (ArmorStand stand : e.getValue()) {
+                if (stand != null && !stand.isDead()) {
+                    stand.remove();
+                }
+            }
+            genIt.remove();
+            final ArmorStand rotating = rotatingBlockByGenerator.remove(e.getKey());
+            if (rotating != null && !rotating.isDead()) {
+                rotating.remove();
+            }
+        }
+    }
+
+    /**
+     * Removes deposit helper holograms in the given world (must be called before unload while the world is valid).
+     */
+    public void removeDepositHologramsInWorld(final World world) {
+        if (world == null) {
+            return;
+        }
+        final Iterator<Map.Entry<Location, List<ArmorStand>>> it = depositHologramsByBlock.entrySet().iterator();
+        while (it.hasNext()) {
+            final Map.Entry<Location, List<ArmorStand>> e = it.next();
+            final Location key = e.getKey();
+            if (key.getWorld() == null || !key.getWorld().equals(world)) {
+                continue;
+            }
+            for (ArmorStand stand : e.getValue()) {
+                if (stand != null && !stand.isDead()) {
+                    stand.remove();
+                }
+            }
+            it.remove();
+        }
     }
 
     public void clearAll() {

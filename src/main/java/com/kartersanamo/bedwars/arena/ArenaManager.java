@@ -1,11 +1,13 @@
 package com.kartersanamo.bedwars.arena;
 
 import com.kartersanamo.bedwars.Bedwars;
+import com.kartersanamo.bedwars.api.arena.EGameState;
 import com.kartersanamo.bedwars.api.arena.IArena;
 import com.kartersanamo.bedwars.api.arena.generator.EGeneratorType;
 import com.kartersanamo.bedwars.configuration.ArenaConfig;
 import com.kartersanamo.bedwars.configuration.GeneratorsConfig;
 import com.kartersanamo.bedwars.configuration.MainConfig;
+import com.kartersanamo.bedwars.lobby.LobbyReturnItem;
 import com.kartersanamo.bedwars.maprestore.InternalAdapter;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -99,198 +101,301 @@ public final class ArenaManager {
             for (Map.Entry<String, ArenaConfig.ModeDefinition> modeEntry : modeDefinitions.entrySet()) {
                 final String modeKey = modeEntry.getKey().toLowerCase(Locale.ROOT);
                 final ArenaConfig.ModeDefinition modeDefinition = modeEntry.getValue();
-                final String modeArenaId = config.getId() + "_" + modeKey;
-
-                final World world = createOrLoadWorldInstance(config, modeKey);
-                if (world == null) {
-                    logger.warning("Skipping arena '" + modeArenaId + "' because its world could not be prepared.");
-                    continue;
-                }
-
-                final Arena arena = Arena.fromConfig(config, modeDefinition, modeArenaId, mainConfig, plugin, world);
-                if (!arena.validate()) {
-                    logger.warning("Disabling arena '" + arena.getId() + "' due to validation errors.");
-                    arena.setEnabled(false);
-                    continue;
-                }
-
-                // Snapshot both arena-region and lobby-region (if present) so that
-                // both the playable map and the waiting lobby can be restored to
-                // their original state between games.
-                final Optional<ArenaConfig.Region> arenaRegionOpt = config.getArenaRegion();
-                final Optional<ArenaConfig.Region> lobbyRegionOpt = config.getLobbyRegion();
-                if (arenaRegionOpt.isPresent()) {
-                    final ArenaConfig.Region base = arenaRegionOpt.get();
-                    final ArenaConfig.Region snapshotRegion;
-                    if (lobbyRegionOpt.isPresent()) {
-                        final Location a1 = base.getPos1();
-                        final Location a2 = base.getPos2();
-                        final Location b1 = lobbyRegionOpt.get().getPos1();
-                        final Location b2 = lobbyRegionOpt.get().getPos2();
-
-                        final int minX = Math.min(Math.min(a1.getBlockX(), a2.getBlockX()), Math.min(b1.getBlockX(), b2.getBlockX()));
-                        final int maxX = Math.max(Math.max(a1.getBlockX(), a2.getBlockX()), Math.max(b1.getBlockX(), b2.getBlockX()));
-                        final int minY = Math.min(Math.min(a1.getBlockY(), a2.getBlockY()), Math.min(b1.getBlockY(), b2.getBlockY()));
-                        final int maxY = Math.max(Math.max(a1.getBlockY(), a2.getBlockY()), Math.max(b1.getBlockY(), b2.getBlockY()));
-                        final int minZ = Math.min(Math.min(a1.getBlockZ(), a2.getBlockZ()), Math.min(b1.getBlockZ(), b2.getBlockZ()));
-                        final int maxZ = Math.max(Math.max(a1.getBlockZ(), a2.getBlockZ()), Math.max(b1.getBlockZ(), b2.getBlockZ()));
-
-                        final Location pos1 = new Location(world, minX, minY, minZ);
-                        final Location pos2 = new Location(world, maxX, maxY, maxZ);
-                        snapshotRegion = new ArenaConfig.Region(pos1, pos2);
-                    } else {
-                        snapshotRegion = base;
-                    }
-                    internalAdapter.snapshotArena(arena, snapshotRegion);
-                }
-
-                final int teamSize = arena.getTeamSize();
-
-                // Create generators and spawn shop NPCs from configuration.
-                for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
-                    final Location forwardTarget = new Location(world,
-                            teamDef.getSpawn().getX(), teamDef.getSpawn().getY(), teamDef.getSpawn().getZ());
-                    for (Location loc : teamDef.getIronGenerators()) {
-                        arena.addGenerator(new OreGenerator(
-                                arena,
-                                EGeneratorType.IRON,
-                                new Location(world, loc.getX(), loc.getY(), loc.getZ()),
-                                generatorsConfig.getIronIntervalTicks(),
-                                mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON),
-                                forwardTarget,
-                                generatorItemTracker
-                        ));
-                    }
-                    for (Location loc : teamDef.getGoldGenerators()) {
-                        arena.addGenerator(new OreGenerator(
-                                arena,
-                                EGeneratorType.GOLD,
-                                new Location(world, loc.getX(), loc.getY(), loc.getZ()),
-                                generatorsConfig.getGoldIntervalTicks(),
-                                mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD),
-                                forwardTarget,
-                                generatorItemTracker
-                        ));
-                    }
-
-                    final Location shopNpcLocation = teamDef.getShopNpc();
-                    if (shopNpcLocation != null && shopNpcLocation.getWorld() != null) {
-                        final Location npcLoc = new Location(world, shopNpcLocation.getX(), shopNpcLocation.getY(),
-                                shopNpcLocation.getZ(), shopNpcLocation.getYaw(), shopNpcLocation.getPitch());
-
-                        // Clean up any old armor stand holograms named "Item Shop" from templates or previous versions.
-                        for (ArmorStand existing : world.getEntitiesByClass(ArmorStand.class)) {
-                            if (existing.getLocation().distanceSquared(npcLoc) <= 4.0D) {
-                                final String name = existing.getCustomName();
-                                if (name != null && ChatColor.stripColor(name).equalsIgnoreCase("Item Shop")) {
-                                    existing.remove();
-                                }
-                            }
-                        }
-
-                        world.spawn(npcLoc, Villager.class, villager -> {
-                            villager.setAI(false);
-                            villager.setCollidable(false);
-                            villager.setInvulnerable(true);
-                            villager.setSilent(true);
-                            villager.setCustomNameVisible(false);
-                            villager.getPersistentDataContainer().set(
-                                    new NamespacedKey(plugin, "bw_npc_role"),
-                                    PersistentDataType.STRING,
-                                    SHOP_NPC_ROLE
-                            );
-                        });
-                        final double x = npcLoc.getX();
-                        final double y = npcLoc.getY();
-                        final double z = npcLoc.getZ();
-                        world.spawn(new Location(world, x, y + 2.25, z), ArmorStand.class, stand -> {
-                            stand.setMarker(true);
-                            stand.setInvisible(true);
-                            stand.setGravity(false);
-                            stand.setCustomNameVisible(true);
-                            stand.setCustomName(ChatColor.AQUA + "ITEM SHOP");
-                        });
-                        world.spawn(new Location(world, x, y + 2, z), ArmorStand.class, stand -> {
-                            stand.setMarker(true);
-                            stand.setInvisible(true);
-                            stand.setGravity(false);
-                            stand.setCustomNameVisible(true);
-                            stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
-                        });
-                    }
-
-                    final Location upgradeNpcLocation = teamDef.getUpgradeNpc();
-                    if (upgradeNpcLocation != null && upgradeNpcLocation.getWorld() != null) {
-                        final Location upgLoc = new Location(world, upgradeNpcLocation.getX(), upgradeNpcLocation.getY(),
-                                upgradeNpcLocation.getZ(), upgradeNpcLocation.getYaw(), upgradeNpcLocation.getPitch());
-                        world.spawn(upgLoc, Villager.class, villager -> {
-                            villager.setAI(false);
-                            villager.setCollidable(false);
-                            villager.setInvulnerable(true);
-                            villager.setSilent(true);
-                            villager.setCustomNameVisible(false);
-                            villager.getPersistentDataContainer().set(
-                                    new NamespacedKey(plugin, "bw_npc_role"),
-                                    PersistentDataType.STRING,
-                                    UPGRADES_NPC_ROLE
-                            );
-                        });
-                        final double ux = upgLoc.getX();
-                        final double uy = upgLoc.getY();
-                        final double uz = upgLoc.getZ();
-                        world.spawn(new Location(world, ux, uy + 2.0, uz), ArmorStand.class, stand -> {
-                            stand.setMarker(true);
-                            stand.setInvisible(true);
-                            stand.setGravity(false);
-                            stand.setCustomNameVisible(true);
-                            stand.setCustomName(ChatColor.AQUA + "UPGRADES");
-                        });
-                        world.spawn(new Location(world, ux, uy + 1.75, uz), ArmorStand.class, stand -> {
-                            stand.setMarker(true);
-                            stand.setInvisible(true);
-                            stand.setGravity(false);
-                            stand.setCustomNameVisible(true);
-                            stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
-                        });
-                    }
-                }
-
-                for (Location loc : config.getDiamondGenerators()) {
-                    arena.addGenerator(new OreGenerator(
-                            arena,
-                            EGeneratorType.DIAMOND,
-                            new Location(world, loc.getX(), loc.getY(), loc.getZ()),
-                            generatorsConfig.getDiamondIntervalTicks(),
-                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.DIAMOND),
-                            null,
-                            generatorItemTracker
-                    ));
-                }
-
-                for (Location loc : config.getEmeraldGenerators()) {
-                    arena.addGenerator(new OreGenerator(
-                            arena,
-                            EGeneratorType.EMERALD,
-                            new Location(world, loc.getX(), loc.getY(), loc.getZ()),
-                            generatorsConfig.getEmeraldIntervalTicks(),
-                            mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.EMERALD),
-                            null,
-                            generatorItemTracker
-                    ));
-                }
-
-                // Pre-create "PUNCH TO / DEPOSIT" holograms above all chests and ender chests
-                // inside this arena's regions so players see them without needing to punch first.
-                if (plugin instanceof Bedwars bw) {
-                    final var hm = bw.getHologramManager();
-                    config.getArenaRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
-                    config.getLobbyRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
-                }
-
-                arenasById.put(arena.getId().toLowerCase(Locale.ROOT), arena);
-                logger.info("Loaded arena '" + arena.getId() + "' (" + arena.getDisplayName() + ", mode=" + modeKey + ")");
+                registerArenaMode(config, modeKey, modeDefinition);
             }
         }
+    }
+
+    private record ResolvedArenaMode(ArenaConfig config, String modeKey, ArenaConfig.ModeDefinition modeDefinition) {
+    }
+
+    /**
+     * Locates YAML + mode matching a loaded arena id ({@code <config id>_<mode>}).
+     */
+    private ResolvedArenaMode resolveArenaModeFromDisk(final String modeArenaId) {
+        final String wanted = modeArenaId.toLowerCase(Locale.ROOT);
+        final File arenasDirectory = new File(plugin.getDataFolder(), "arenas");
+        final List<ArenaConfig> configs = ArenaConfig.loadAll(arenasDirectory, logger);
+        for (ArenaConfig cfg : configs) {
+            if (!cfg.isEnabled()) {
+                continue;
+            }
+            final Map<String, ArenaConfig.ModeDefinition> modeDefinitions = cfg.getGameModes(
+                    mainConfig.getDefaultMinPlayers(),
+                    mainConfig.getDefaultMaxPlayers(),
+                    mainConfig.getDefaultTeamSize()
+            );
+            for (Map.Entry<String, ArenaConfig.ModeDefinition> modeEntry : modeDefinitions.entrySet()) {
+                final String modeKey = modeEntry.getKey().toLowerCase(Locale.ROOT);
+                final String assembled = (cfg.getId() + "_" + modeKey).toLowerCase(Locale.ROOT);
+                if (assembled.equals(wanted)) {
+                    return new ResolvedArenaMode(cfg, modeKey, modeEntry.getValue());
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Unloads this arena mode's copied world without saving, recopies folders from the template map, reloads it, and rebuilds snapshots, generators and NPCs.
+     * Evicts everyone standing in that world first.
+     *
+     * @return {@code null} on success; otherwise an error detail for admins
+     */
+    public String refreshArenaWorldCopy(final String modeArenaId) {
+        final String idKey = modeArenaId.toLowerCase(Locale.ROOT);
+        final IArena current = arenasById.get(idKey);
+        if (!(current instanceof Arena oldArena)) {
+            return "That arena could not be found.";
+        }
+
+        final ResolvedArenaMode resolved = resolveArenaModeFromDisk(idKey);
+        if (resolved == null) {
+            return "No matching arena YAML is enabled on disk.";
+        }
+
+        final World world = oldArena.getWorld();
+        if (world == null) {
+            return "Arena has no loaded world.";
+        }
+
+        oldArena.cancelScheduledTasks();
+        oldArena.setGameState(EGameState.LOBBY_WAITING);
+
+        final Location lobbySpawn = mainConfig.getLobbySpawn();
+        final Location fallback = lobbySpawn != null ? lobbySpawn : Bukkit.getWorlds().getFirst().getSpawnLocation();
+
+        for (Player p : new ArrayList<>(world.getPlayers())) {
+            p.teleport(fallback);
+            if (oldArena.contains(p)) {
+                oldArena.removePlayer(p, false);
+            }
+            playerLeftArena(p);
+            if (plugin instanceof Bedwars bw) {
+                bw.getSidebarService().removeSidebar(p);
+            }
+            LobbyReturnItem.removeFrom(p);
+        }
+
+        if (plugin instanceof Bedwars bw && bw.getHologramManager() != null) {
+            bw.getHologramManager().removeGeneratorHologramsForArena(oldArena);
+            bw.getHologramManager().removeDepositHologramsInWorld(world);
+        }
+
+        if (!Bukkit.unloadWorld(world, false)) {
+            logger.severe("Failed to unload world for arena refresh '" + idKey + "'.");
+            return "Could not unload the arena world (another plugin may be keeping it loaded).";
+        }
+
+        internalAdapter.forgetArena(oldArena.getId());
+        arenasById.remove(idKey);
+
+        if (!registerArenaMode(resolved.config(), resolved.modeKey(), resolved.modeDefinition())) {
+            logger.severe("Arena '" + idKey + "' was unloaded but failed to register after world copy.");
+            return "World was recopied but the arena failed to finish loading (see console).";
+        }
+
+        logger.info("Refreshed arena world copy for '" + idKey + "' from template.");
+        return null;
+    }
+
+    /**
+     * Registers one mode instance: world folder, {@link Arena}, generators, NPCs, map snapshot, deposit holograms.
+     *
+     * @return false if the arena was skipped (console already logs the reason)
+     */
+    private boolean registerArenaMode(final ArenaConfig config, final String modeKey, final ArenaConfig.ModeDefinition modeDefinition) {
+        final String modeArenaId = config.getId() + "_" + modeKey;
+
+        final World world = createOrLoadWorldInstance(config, modeKey);
+        if (world == null) {
+            logger.warning("Skipping arena '" + modeArenaId + "' because its world could not be prepared.");
+            return false;
+        }
+
+        final Arena arena = Arena.fromConfig(config, modeDefinition, modeArenaId, mainConfig, plugin, world);
+        if (!arena.validate()) {
+            logger.warning("Disabling arena '" + arena.getId() + "' due to validation errors.");
+            arena.setEnabled(false);
+            return false;
+        }
+
+        // Snapshot both arena-region and lobby-region (if present) so that
+        // both the playable map and the waiting lobby can be restored to
+        // their original state between games.
+        final Optional<ArenaConfig.Region> arenaRegionOpt = config.getArenaRegion();
+        final Optional<ArenaConfig.Region> lobbyRegionOpt = config.getLobbyRegion();
+        if (arenaRegionOpt.isPresent()) {
+            final ArenaConfig.Region base = arenaRegionOpt.get();
+            final ArenaConfig.Region snapshotRegion;
+            if (lobbyRegionOpt.isPresent()) {
+                final Location a1 = base.getPos1();
+                final Location a2 = base.getPos2();
+                final Location b1 = lobbyRegionOpt.get().getPos1();
+                final Location b2 = lobbyRegionOpt.get().getPos2();
+
+                final int minX = Math.min(Math.min(a1.getBlockX(), a2.getBlockX()), Math.min(b1.getBlockX(), b2.getBlockX()));
+                final int maxX = Math.max(Math.max(a1.getBlockX(), a2.getBlockX()), Math.max(b1.getBlockX(), b2.getBlockX()));
+                final int minY = Math.min(Math.min(a1.getBlockY(), a2.getBlockY()), Math.min(b1.getBlockY(), b2.getBlockY()));
+                final int maxY = Math.max(Math.max(a1.getBlockY(), a2.getBlockY()), Math.max(b1.getBlockY(), b2.getBlockY()));
+                final int minZ = Math.min(Math.min(a1.getBlockZ(), a2.getBlockZ()), Math.min(b1.getBlockZ(), b2.getBlockZ()));
+                final int maxZ = Math.max(Math.max(a1.getBlockZ(), a2.getBlockZ()), Math.max(b1.getBlockZ(), b2.getBlockZ()));
+
+                final Location pos1 = new Location(world, minX, minY, minZ);
+                final Location pos2 = new Location(world, maxX, maxY, maxZ);
+                snapshotRegion = new ArenaConfig.Region(pos1, pos2);
+            } else {
+                snapshotRegion = base;
+            }
+            internalAdapter.snapshotArena(arena, snapshotRegion);
+        }
+
+        final int teamSize = arena.getTeamSize();
+
+        // Create generators and spawn shop NPCs from configuration.
+        for (ArenaConfig.TeamDefinition teamDef : config.getTeamDefinitions()) {
+            final Location forwardTarget = new Location(world,
+                    teamDef.getSpawn().getX(), teamDef.getSpawn().getY(), teamDef.getSpawn().getZ());
+            for (Location loc : teamDef.getIronGenerators()) {
+                arena.addGenerator(new OreGenerator(
+                        arena,
+                        EGeneratorType.IRON,
+                        new Location(world, loc.getX(), loc.getY(), loc.getZ()),
+                        generatorsConfig.getIronIntervalTicks(),
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.IRON),
+                        forwardTarget,
+                        generatorItemTracker
+                ));
+            }
+            for (Location loc : teamDef.getGoldGenerators()) {
+                arena.addGenerator(new OreGenerator(
+                        arena,
+                        EGeneratorType.GOLD,
+                        new Location(world, loc.getX(), loc.getY(), loc.getZ()),
+                        generatorsConfig.getGoldIntervalTicks(),
+                        mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.GOLD),
+                        forwardTarget,
+                        generatorItemTracker
+                ));
+            }
+
+            final Location shopNpcLocation = teamDef.getShopNpc();
+            if (shopNpcLocation != null && shopNpcLocation.getWorld() != null) {
+                final Location npcLoc = new Location(world, shopNpcLocation.getX(), shopNpcLocation.getY(),
+                        shopNpcLocation.getZ(), shopNpcLocation.getYaw(), shopNpcLocation.getPitch());
+
+                // Clean up any old armor stand holograms named "Item Shop" from templates or previous versions.
+                for (ArmorStand existing : world.getEntitiesByClass(ArmorStand.class)) {
+                    if (existing.getLocation().distanceSquared(npcLoc) <= 4.0D) {
+                        final String name = existing.getCustomName();
+                        if (name != null && ChatColor.stripColor(name).equalsIgnoreCase("Item Shop")) {
+                            existing.remove();
+                        }
+                    }
+                }
+
+                world.spawn(npcLoc, Villager.class, villager -> {
+                    villager.setAI(false);
+                    villager.setCollidable(false);
+                    villager.setInvulnerable(true);
+                    villager.setSilent(true);
+                    villager.setCustomNameVisible(false);
+                    villager.getPersistentDataContainer().set(
+                            new NamespacedKey(plugin, "bw_npc_role"),
+                            PersistentDataType.STRING,
+                            SHOP_NPC_ROLE
+                    );
+                });
+                final double x = npcLoc.getX();
+                final double y = npcLoc.getY();
+                final double z = npcLoc.getZ();
+                world.spawn(new Location(world, x, y + 2.25, z), ArmorStand.class, stand -> {
+                    stand.setMarker(true);
+                    stand.setInvisible(true);
+                    stand.setGravity(false);
+                    stand.setCustomNameVisible(true);
+                    stand.setCustomName(ChatColor.AQUA + "ITEM SHOP");
+                });
+                world.spawn(new Location(world, x, y + 2, z), ArmorStand.class, stand -> {
+                    stand.setMarker(true);
+                    stand.setInvisible(true);
+                    stand.setGravity(false);
+                    stand.setCustomNameVisible(true);
+                    stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
+                });
+            }
+
+            final Location upgradeNpcLocation = teamDef.getUpgradeNpc();
+            if (upgradeNpcLocation != null && upgradeNpcLocation.getWorld() != null) {
+                final Location upgLoc = new Location(world, upgradeNpcLocation.getX(), upgradeNpcLocation.getY(),
+                        upgradeNpcLocation.getZ(), upgradeNpcLocation.getYaw(), upgradeNpcLocation.getPitch());
+                world.spawn(upgLoc, Villager.class, villager -> {
+                    villager.setAI(false);
+                    villager.setCollidable(false);
+                    villager.setInvulnerable(true);
+                    villager.setSilent(true);
+                    villager.setCustomNameVisible(false);
+                    villager.getPersistentDataContainer().set(
+                            new NamespacedKey(plugin, "bw_npc_role"),
+                            PersistentDataType.STRING,
+                            UPGRADES_NPC_ROLE
+                    );
+                });
+                final double ux = upgLoc.getX();
+                final double uy = upgLoc.getY();
+                final double uz = upgLoc.getZ();
+                world.spawn(new Location(world, ux, uy + 2.0, uz), ArmorStand.class, stand -> {
+                    stand.setMarker(true);
+                    stand.setInvisible(true);
+                    stand.setGravity(false);
+                    stand.setCustomNameVisible(true);
+                    stand.setCustomName(ChatColor.AQUA + "UPGRADES");
+                });
+                world.spawn(new Location(world, ux, uy + 1.75, uz), ArmorStand.class, stand -> {
+                    stand.setMarker(true);
+                    stand.setInvisible(true);
+                    stand.setGravity(false);
+                    stand.setCustomNameVisible(true);
+                    stand.setCustomName(ChatColor.YELLOW + "" + ChatColor.BOLD + "RIGHT CLICK");
+                });
+            }
+        }
+
+        for (Location loc : config.getDiamondGenerators()) {
+            arena.addGenerator(new OreGenerator(
+                    arena,
+                    EGeneratorType.DIAMOND,
+                    new Location(world, loc.getX(), loc.getY(), loc.getZ()),
+                    generatorsConfig.getDiamondIntervalTicks(),
+                    mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.DIAMOND),
+                    null,
+                    generatorItemTracker
+            ));
+        }
+
+        for (Location loc : config.getEmeraldGenerators()) {
+            arena.addGenerator(new OreGenerator(
+                    arena,
+                    EGeneratorType.EMERALD,
+                    new Location(world, loc.getX(), loc.getY(), loc.getZ()),
+                    generatorsConfig.getEmeraldIntervalTicks(),
+                    mainConfig.getGeneratorMaxItems(teamSize, EGeneratorType.EMERALD),
+                    null,
+                    generatorItemTracker
+            ));
+        }
+
+        // Pre-create "PUNCH TO / DEPOSIT" holograms above all chests and ender chests
+        // inside this arena's regions so players see them without needing to punch first.
+        if (plugin instanceof Bedwars bw) {
+            final var hm = bw.getHologramManager();
+            config.getArenaRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
+            config.getLobbyRegion().ifPresent(region -> spawnDepositHologramsInRegion(world, region, hm));
+        }
+
+        arenasById.put(arena.getId().toLowerCase(Locale.ROOT), arena);
+        logger.info("Loaded arena '" + arena.getId() + "' (" + arena.getDisplayName() + ", mode=" + modeKey + ")");
+        return true;
     }
 
     public Collection<IArena> getArenas() {

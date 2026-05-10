@@ -57,6 +57,12 @@ public final class DeathListener implements Listener {
     public static void handleArenaDeath(final Bedwars plugin, final Player victim, final Player killer, final IArena arena) {
         final boolean finalKill = arena.getTeam(victim).map(ITeam::isBedDestroyed).orElse(false);
 
+        // Snapshot team colors before handlePlayerDeath — final kills remove the victim from their team immediately.
+        final ChatColor victimColor = arena.getTeam(victim).map(t -> t.getColor().getChatColor()).orElse(ChatColor.WHITE);
+        final ChatColor killerTeamColor = killer != null && killer != victim
+                ? arena.getTeam(killer).map(t -> t.getColor().getChatColor()).orElse(ChatColor.WHITE)
+                : ChatColor.WHITE;
+
         if (killer != null && killer != victim && plugin.getArenaManager().getArena(killer) == arena) {
             transferOresToKiller(victim, killer);
         }
@@ -67,15 +73,16 @@ public final class DeathListener implements Listener {
             if (finalKill) {
                 arena.recordFinalKill(killer.getUniqueId());
             }
-            broadcastKillMessage(arena, victim, killer, finalKill);
+            broadcastKillMessage(arena, victim, killer, finalKill, victimColor, killerTeamColor);
         }
     }
 
-    private static void broadcastKillMessage(final IArena arena, final Player victim, final Player killer, final boolean finalKill) {
-        ChatColor victimColor = ChatColor.WHITE;
-        ChatColor killerColor = ChatColor.WHITE;
-        if (arena.getTeam(victim).isPresent()) victimColor = arena.getTeam(victim).get().getColor().getChatColor();
-        if (arena.getTeam(killer).isPresent()) killerColor = arena.getTeam(killer).get().getColor().getChatColor();
+    private static void broadcastKillMessage(final IArena arena,
+                                             final Player victim,
+                                             final Player killer,
+                                             final boolean finalKill,
+                                             final ChatColor victimColor,
+                                             final ChatColor killerColor) {
         final String message = victimColor + victim.getName() + ChatColor.GRAY + " was killed by " + killerColor + killer.getName() + "."
                 + (finalKill ? " " + ChatColor.AQUA + ChatColor.BOLD + "FINAL KILL!" : "");
         for (Player p : arena.getPlayers()) {

@@ -1113,30 +1113,28 @@ public final class Arena implements IArena {
             if (winningTeam != null && winningTeam.getOnlineMembers().contains(p)) {
                 p.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!", "", 10, 70, 20);
             }
-            p.sendMessage(separator);
-            p.sendMessage(centerChat(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars"));
-            p.sendMessage("");
-            if (winningTeam != null) {
-                final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
-                p.sendMessage(centerChat(winningTeam.getColor().getChatColor() + "Winners" + ChatColor.GRAY + " - " + names));
-            }
-            p.sendMessage("");
-            sendKillerStats(p);
-            p.sendMessage(separator);
+            sendSharedGameOverChat(p, winningTeam, separator);
         }
         for (Player p : getSpectators()) {
-            p.sendMessage(separator);
-            p.sendMessage(ChatColor.WHITE + "Bed Wars");
-            p.sendMessage(separator);
-            if (winningTeam != null) {
-                final String colorName = winningTeam.getColor().name().charAt(0) + winningTeam.getColor().name().substring(1).toLowerCase(Locale.ROOT);
-                final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
-                p.sendMessage(winningTeam.getColor().getChatColor() + colorName + ChatColor.WHITE + " - " + names);
-            }
-            sendKillerStats(p);
-            p.sendMessage("");
-            p.sendMessage(separator);
+            sendSharedGameOverChat(p, winningTeam, separator);
         }
+    }
+
+    /**
+     * Same centered Bed Wars banner and winner stats for surviving players and spectators (eliminated players).
+     */
+    private void sendSharedGameOverChat(final Player p, final ITeam winningTeam, final String separator) {
+        p.sendMessage(separator);
+        p.sendMessage(centerChat(ChatColor.WHITE + "" + ChatColor.BOLD + "Bed Wars"));
+        p.sendMessage("");
+        if (winningTeam != null) {
+            final String names = String.join(", ", winningTeam.getOnlineMembers().stream().map(Player::getName).toList());
+            p.sendMessage(centerChat(winningTeam.getColor().getChatColor() + "Winners"
+                    + ChatColor.GRAY + " - " + ChatColor.WHITE + names));
+        }
+        p.sendMessage("");
+        sendKillerStats(p);
+        p.sendMessage(separator);
     }
 
     private void sendKillerStats(final Player recipient) {

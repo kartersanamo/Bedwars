@@ -53,7 +53,9 @@ public final class InternalAdapter {
                 for (int z = min.getBlockZ(); z <= max.getBlockZ(); z++) {
                     final Block block = world.getBlockAt(x, y, z);
                     final BlockData data = block.getBlockData().clone();
-                    if (data.getMaterial().isAir()) return;
+                    if (data.getMaterial().isAir()) {
+                        continue;
+                    }
 
                     snapshot.put(new BlockPosition(x, y, z), data);
                 }
@@ -85,8 +87,9 @@ public final class InternalAdapter {
 
         final BlockPosition position = BlockPosition.fromBlock(block);
         final BlockData data = snapshot.get(position);
+        // Non-air cells from the template are stored; originally-air cells are omitted.
         if (data == null) {
-            return false;
+            return true;
         }
 
         return data.getMaterial().isAir();
